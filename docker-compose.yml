@@ -1,0 +1,22 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: gestor-contratos-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-gestor}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-gestor_demo_2026}
+      POSTGRES_DB: ${DB_NAME:-gestor_contratos}
+    ports:
+      # 5433 en el host: el 5432 puede estar ocupado por otros proyectos de este equipo.
+      - '${DB_PORT:-5433}:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USER:-gestor} -d ${DB_NAME:-gestor_contratos}']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  pgdata:
