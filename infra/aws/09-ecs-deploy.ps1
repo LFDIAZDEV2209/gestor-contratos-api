@@ -30,7 +30,7 @@ $dbEndpoint = $endpJson[0]
 $dbPort = $endpJson[1]
 $dbStatus = $endpJson[2]
 Write-Host "RDS: $dbEndpoint : $dbPort ($dbStatus)"
-$valkey = aws elasticache describe-replication-groups --region $region --replication-group-id nexogc-valkey-prod --query "ReplicationGroups[0].[ConfigurationEndpoint.Address,ConfigurationEndpoint.Port,Status]" --output json | ConvertFrom-Json
+$valkey = aws elasticache describe-replication-groups --region $region --replication-group-id nexogc-valkey-prod --query "ReplicationGroups[0].[NodeGroups[0].PrimaryEndpoint.Address,NodeGroups[0].PrimaryEndpoint.Port,Status]" --output json | ConvertFrom-Json
 $valkeyEndpoint = $valkey[0]; $valkeyPort = $valkey[1]; $valkeyStatus = $valkey[2]
 Write-Host "Valkey: $valkeyEndpoint : $valkeyPort ($valkeyStatus)"
 $tg = aws elbv2 describe-target-groups --region $region --names nexogc-tg-api --query "TargetGroups[0].TargetGroupArn" --output text
