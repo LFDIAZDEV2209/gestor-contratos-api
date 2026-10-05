@@ -18,7 +18,9 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { GeoModule } from './modules/geo/geo.module';
 import { ContractsCoreModule } from './modules/contracts/contracts.module';
 import { ChildCollectionsModule } from './modules/contracts/child-collections.module';
+import { DashboardsModule } from './modules/dashboards/dashboards.module';
 import { HealthController } from './health.controller';
+import { CacheModule } from './cache/cache.module';
 
 /**
  * Composición de la aplicación. El orden importa para el enrutador de Express:
@@ -57,6 +59,8 @@ import { HealthController } from './health.controller';
     AuditReadOnlyModule,
     ContractsCoreModule,
     ChildCollectionsModule,
+    DashboardsModule,
+    CacheModule,
   ],
   controllers: [HealthController],
 })
