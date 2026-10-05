@@ -170,13 +170,31 @@ src/
     ├── audit/                   # Bitácora solo lectura
     ├── settings/                # Parámetros + catálogos
     ├── geo/                     # Agregados del mapa
+    ├── dashboards/              # Refresh programado de materialized views
     └── reports/                 # 19 reportes json/xlsx/pdf
 ```
+
+## Caché (Valkey) y dashboards
+
+- **Abstracción `src/cache`**: `CacheService` con driver `valkey` (ioredis, compatible con ElastiCache for Valkey) o `memory` fallback — cambio de entorno solo por `.env` (`CACHE_DRIVER`, `VALKEY_HOST/PORT/PASSWORD/TLS`).
+- **TTLs por caso**: settings/catálogos 10 m (invalidación al escribir), geo 15 m, reportes JSON 2 m, KPIs del dashboard 60 s. Namespace `nexogc:<env>:*`, jitter 10 %, guard anti-stampede (single-flight + lock NX).
+- **Materialized views** (`mv_geo_aggregates`, `mv_reports_summary`, `mv_dashboard_kpis`) con refresh CONCURRENTLY programado 06:05 America/Bogota (`DashboardRefreshService`) — ver `docs/BASE_DATOS.md` y `docs/CACHE.md`.
+
+## Observabilidad
+
+- Logging JSON estructurado con `requestId`/`userId`/rol/status/duración; redacción de password/token/secret.
+- `GET /api/health/live` (liveness ALB/ECS) · `GET /api/health/ready` (DB + caché).
+- Slow queries TypeORM > 500 ms con warn. Detalle: `docs/OBSERVABILIDAD.md`.
+
+## Infraestructura local y AWS
+
+- Local: `docker compose up -d` → PostgreSQL 16 (`localhost:5433`) + Valkey 8 (`localhost:6380`, auth/AOF/allkeys-lru).
+- AWS: scripts idempotentes `infra/aws/01..09` — VPC 2 AZ (DMZ/ALB+NAT, app privada, data aislada), RDS PostgreSQL, ElastiCache Valkey, WAF (managed COUNT + rate limit), S3 privado, Secrets Manager, ECS Fargate, alarmas CloudWatch. Ver `docs/AWS.md`.
 
 ## Roadmap de conexión (fases del plan)
 
 - **Fase 1:** SSO OIDC (Azure AD/Keycloak), recalcular alerts en worker con notificaciones, IP real ya implementada.
-- **Fase 2:** blob storage (Azure/S3) con URLs firmadas reales para documentos.
+- **Fase 2:** blob storage S3 con URLs firmadas (abstracción de storage ya preparada, ver `.env` S3_*).
 - **Fase 3:** recálculo programado + notificaciones SMTP/Graph.
 - **Fase 4:** WhatsApp + tiempo real (SSE/WebSockets).
 - **Fase 5:** OCR (`POST /documents/:id/extract`), PDF oficial y Excel en servidor (xlsx ya servido por API).
