@@ -24,13 +24,13 @@ Write-Host "Imagen en ECR: $image"
 # --- 3) Credenciales/ARNs para el taskdef ---
 $execRole = (aws iam get-role --role-name nexogc-ecs-execution-role --query "Role.Arn" --output text)
 $taskRole = (aws iam get-role --role-name nexogc-ecs-task-role --query "Role.Arn" --output text)
-$rds = aws rds describe-db-instances --region $region --db-instance-identifier nexogc-db-prod --query "DBInstances[0].[Endpoint.Address,DBInstances[0].Endpoint.Port,DBInstanceStatus]" --output json
+$rds = aws rds describe-db-instances --region $region --db-instance-identifier nexogc-db-prod --query "DBInstances[0].[Endpoint.Address,Endpoint.Port,DBInstanceStatus]" --output json
 $endpJson = $rds | ConvertFrom-Json
 $dbEndpoint = $endpJson[0]
 $dbPort = $endpJson[1]
 $dbStatus = $endpJson[2]
 Write-Host "RDS: $dbEndpoint : $dbPort ($dbStatus)"
-$valkey = aws elasticache describe-replication-groups --region $region --replication-group-id nexogc-valkey-prod --query "ReplicationGroups[].[ConfigurationEndpoint.Address,ConfigurationEndpoint.Port,Status]" --output json | ConvertFrom-Json
+$valkey = aws elasticache describe-replication-groups --region $region --replication-group-id nexogc-valkey-prod --query "ReplicationGroups[0].[ConfigurationEndpoint.Address,ConfigurationEndpoint.Port,Status]" --output json | ConvertFrom-Json
 $valkeyEndpoint = $valkey[0]; $valkeyPort = $valkey[1]; $valkeyStatus = $valkey[2]
 Write-Host "Valkey: $valkeyEndpoint : $valkeyPort ($valkeyStatus)"
 $tg = aws elbv2 describe-target-groups --region $region --names nexogc-tg-api --query "TargetGroups[0].TargetGroupArn" --output text
@@ -93,7 +93,8 @@ if ($svc -and $svc -ne "None" -and $svc -ne "null") {
   aws ecs update-service --region $region --cluster nexogc-cluster --service nexogc-api-svc --task-definition $tdArn --desired-count 2 --output text | Out-Null
   Write-Host "Service actualizado a taskdef nueva"
 } else {
-  aws ecs create-service --region $region --cluster nexogc-cluster --service-name nexogc-api-svc --task-definition $tdArn --desired-count 2 --launch-type FARGATE --load-balancers "targetGroupArn=$tg,containerName=api,containerPort=4000" --health-check-grace-period-seconds 90 --network-configuration "awsvpcConfiguration={subnets=[$appA,$appB],securityGroups=[(aws ec2 describe-security-groups --region $region --filters Name=group-name,Values=nexogc-sg-app --query 'SecurityGroups[0].GroupId' --output text)],assignPublicIp=DISABLED}" --output text | Out-Null
+$appSg = aws ec2 describe-security-groups --region $region --filters Name=group-name,Values=nexogc-sg-app --query "SecurityGroups[0].GroupId" --output text
+  aws ecs create-service --region $region --cluster nexogc-cluster --service-name nexogc-api-svc --task-definition $tdArn --desired-count 2 --launch-type FARGATE --load-balancers "targetGroupArn=$tg,containerName=api,containerPort=4000" --health-check-grace-period-seconds 90 --network-configuration "awsvpcConfiguration={subnets=[$appA,$appB],securityGroups=[$appSg],assignPublicIp=DISABLED}" --output text | Out-Null
   Write-Host "Service creado: nexogc-api-svc (2 tasks)"
 }
 
