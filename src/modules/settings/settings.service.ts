@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { SettingEntity, CatalogEntity, CatalogItemEntity } from './settings.entity';
@@ -6,6 +6,7 @@ import { ParametrosAlerta, PARAMETROS_DEFECTO } from '../../engines/types';
 import { ReqContext } from '../../common/req-context';
 import { AuditService } from '../audit/audit.service';
 import { In } from 'typeorm';
+import { CACHE_SERVICE, CacheService, CACHE_TTLS } from '../../cache/cache.service';
 
 /** Catálogos por defecto (files/02): 11 configurables. */
 export const CATALOGOS_DEFECTO: Record<string, string[]> = {
@@ -59,33 +60,33 @@ export class SettingsService {
     @InjectRepository(CatalogEntity) private readonly catRepo: Repository<CatalogEntity>,
     @InjectRepository(CatalogItemEntity) private readonly itemRepo: Repository<CatalogItemEntity>,
     private readonly audit: AuditService,
+    @Inject(CACHE_SERVICE) private readonly cache: CacheService,
   ) {}
 
   /** Parámetros de alertas para los motores (fila única, con valores por defecto). */
   async parametros(): Promise<ParametrosAlerta> {
-    const s = await this.repo.findOne({ where: { id: 1 } });
-    if (!s) return PARAMETROS_DEFECTO;
-    return {
-      alertDays: s.alertDays,
-      criticalDays: s.criticalDays,
-      budgetPct: s.budgetPct,
-      gapPct: s.gapPct,
-    };
+    return this.cache.wrap('settings:parametros', async () => {
+      const s = await this.repo.findOne({ where: { id: 1 } });
+      if (!s) return PARAMETROS_DEFECTO;
+      return { alertDays: s.alertDays, criticalDays: s.criticalDays, budgetPct: s.budgetPct, gapPct: s.gapPct };
+    }, CACHE_TTLS.settings);
   }
 
   async obtener(): Promise<SettingEntity> {
-    let s = await this.repo.findOne({ where: { id: 1 } });
-    if (!s) {
-      s = this.repo.create({
-        id: 1,
-        alertDays: PARAMETROS_DEFECTO.alertDays,
-        criticalDays: PARAMETROS_DEFECTO.criticalDays,
-        budgetPct: PARAMETROS_DEFECTO.budgetPct,
-        gapPct: PARAMETROS_DEFECTO.gapPct,
-      });
-      await this.repo.insert(s);
-    }
-    return s;
+    return this.cache.wrap('settings:obtener', async () => {
+      let s = await this.repo.findOne({ where: { id: 1 } });
+      if (!s) {
+        s = this.repo.create({
+          id: 1,
+          alertDays: PARAMETROS_DEFECTO.alertDays,
+          criticalDays: PARAMETROS_DEFECTO.criticalDays,
+          budgetPct: PARAMETROS_DEFECTO.budgetPct,
+          gapPct: PARAMETROS_DEFECTO.gapPct,
+        });
+        await this.repo.insert(s);
+      }
+      return s;
+    }, CACHE_TTLS.settings);
   }
 
   async actualizar(
@@ -111,19 +112,24 @@ export class SettingsService {
         nuevo: JSON.stringify(v),
       }));
     await this.audit.registrar(ctx, entradas);
+    await this.cache.delByPattern('settings:*');
     return antes;
   }
 
   async nombresCatalogos(): Promise<string[]> {
-    const cats = await this.catRepo.find();
-    return cats.map((c) => c.nombre).sort();
+    return this.cache.wrap('settings:catalogos:nombres', async () => {
+      const cats = await this.catRepo.find();
+      return cats.map((c) => c.nombre).sort();
+    }, CACHE_TTLS.settings);
   }
 
   async catalogo(nombre: string): Promise<{ nombre: string; valores: string[] }> {
-    const cat = await this.catRepo.findOne({ where: { nombre } });
-    if (!cat) return { nombre, valores: [] };
-    const items = await this.itemRepo.find({ where: { catalogNombre: nombre }, order: { orden: 'ASC', id: 'ASC' } });
-    return { nombre, valores: items.map((i) => i.valor) };
+    return this.cache.wrap(`settings:catalogos:${nombre}`, async () => {
+      const cat = await this.catRepo.findOne({ where: { nombre } });
+      if (!cat) return { nombre, valores: [] };
+      const items = await this.itemRepo.find({ where: { catalogNombre: nombre }, order: { orden: 'ASC', id: 'ASC' } });
+      return { nombre, valores: items.map((i) => i.valor) };
+    }, CACHE_TTLS.settings);
   }
 
   /** Reemplaza los valores de un catálogo (solo ADMINISTRADOR). */
@@ -150,6 +156,7 @@ export class SettingsService {
         nuevo: valores.join(' | '),
       },
     ]);
+    await this.cache.delByPattern('settings:catalogos:*');
     return { nombre, valores };
   }
 
@@ -165,5 +172,6 @@ export class SettingsService {
         valores.map((valor, i) => this.itemRepo.create({ catalogNombre: nombre, valor, orden: i })),
       );
     }
+    if (faltan.length) await this.cache.delByPattern('settings:catalogos:*');
   }
 }

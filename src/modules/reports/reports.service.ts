@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Response } from 'express';
@@ -29,6 +29,7 @@ import { ReqContext } from '../../common/req-context';
 import { AuditService } from '../audit/audit.service';
 import { hoyISO, redondear1 } from '../../common/dates';
 import { nivelRiesgo } from '../../engines/types';
+import { CACHE_SERVICE, CacheService, CACHE_TTLS } from '../../cache/cache.service';
 
 
 export interface Columna {
@@ -77,6 +78,7 @@ export class ReportsService {
     private readonly settings: SettingsService,
     private readonly loader: ContractContextLoader,
     private readonly audit: AuditService,
+    @Inject(CACHE_SERVICE) private readonly cache: CacheService,
   ) {}
 
   async construir(key: string): Promise<Reporte> {
@@ -108,7 +110,9 @@ export class ReportsService {
     if (key === 'r_aud' && !(await this.roles.tienePermiso(ctx.rol, 'AUDITAR'))) {
       throw new Prohibido('El reporte de auditoría requiere el permiso AUDITAR.');
     }
-    const reporte = await this.construir(key);
+    const reporte = format === 'json'
+      ? await this.cache.wrap(`reports:${key}`, () => this.construir(key), CACHE_TTLS.reports)
+      : await this.construir(key);
     const hoy = hoyISO();
     if (format === 'xlsx') {
       const buffer = await this.aExcel(reporte);

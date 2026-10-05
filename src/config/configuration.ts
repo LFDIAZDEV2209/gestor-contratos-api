@@ -7,6 +7,14 @@ export interface Configuracion {
   alertCron: string;
   uploadDir: string;
   db: { host: string; port: number; user: string; password: string; name: string };
+  cache: {
+    host?: string;
+    port: number;
+    password?: string;
+    tls: boolean;
+    driver: 'valkey' | 'memory';
+    defaultTtl: number;
+  };
 }
 
 export default (): Configuracion => ({
@@ -19,6 +27,14 @@ export default (): Configuracion => ({
     .filter(Boolean),
   alertCron: process.env.ALERT_CRON ?? '0 6 * * *',
   uploadDir: process.env.UPLOAD_DIR ?? './data/uploads',
+  cache: {
+    host: process.env.VALKEY_HOST || undefined,
+    port: Number(process.env.VALKEY_PORT ?? 6379),
+    password: process.env.VALKEY_PASSWORD || undefined,
+    tls: process.env.VALKEY_TLS === 'true' || process.env.VALKEY_TLS === '1',
+    driver: process.env.CACHE_DRIVER === 'memory' ? 'memory' : 'valkey',
+    defaultTtl: Number(process.env.CACHE_DEFAULT_TTL ?? 300),
+  },
   db: {
     host: process.env.DB_HOST ?? 'localhost',
     port: Number(process.env.DB_PORT ?? 5433),

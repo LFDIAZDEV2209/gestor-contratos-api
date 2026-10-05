@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ContractEntity } from '../contracts/entities/contract.entity';
@@ -10,6 +10,7 @@ import {
   agregarPorDepto, agregarPorRegion, totalesNacionales,
   ContratoMapa, GarantiaMapa,
 } from '../../engines/map.engine';
+import { CACHE_SERVICE, CacheService, CACHE_TTLS } from '../../cache/cache.service';
 
 /** Agregados del mapa de Colombia calculados en el servidor (files/07). */
 @Injectable()
@@ -20,6 +21,7 @@ export class GeoService {
     @InjectRepository(CupoEntity) private readonly cupos: Repository<CupoEntity>,
     private readonly loader: ContractContextLoader,
     private readonly settings: SettingsService,
+    @Inject(CACHE_SERVICE) private readonly cache: CacheService,
   ) {}
 
   private async insumos(filtros: { aseguradora?: string; estado?: string; companyId?: string }) {
@@ -66,16 +68,20 @@ export class GeoService {
   }
 
   async departamentos(filtros: { metric?: string; measure?: string; aseguradora?: string; estado?: string; companyId?: string }) {
-    const { contratosMapa, garantiasMapa, f } = await this.insumos(filtros);
-    const data = agregarPorDepto(contratosMapa, garantiasMapa, f);
-    const totales = totalesNacionales(contratosMapa, garantiasMapa, f);
-    return { metric: filtros.metric ?? 'contratos', measure: filtros.measure ?? 'n', totales, data };
+    return this.cache.wrap(`geo:departamentos:${JSON.stringify(filtros)}`, async () => {
+      const { contratosMapa, garantiasMapa, f } = await this.insumos(filtros);
+      const data = agregarPorDepto(contratosMapa, garantiasMapa, f);
+      const totales = totalesNacionales(contratosMapa, garantiasMapa, f);
+      return { metric: filtros.metric ?? 'contratos', measure: filtros.measure ?? 'n', totales, data };
+    }, CACHE_TTLS.geo);
   }
 
   async regiones(filtros: { aseguradora?: string; estado?: string; companyId?: string }) {
-    const { contratosMapa, garantiasMapa, f } = await this.insumos(filtros);
-    const data = agregarPorRegion(contratosMapa, garantiasMapa, f);
-    const totales = totalesNacionales(contratosMapa, garantiasMapa, f);
-    return { totales, data };
+    return this.cache.wrap(`geo:regiones:${JSON.stringify(filtros)}`, async () => {
+      const { contratosMapa, garantiasMapa, f } = await this.insumos(filtros);
+      const data = agregarPorRegion(contratosMapa, garantiasMapa, f);
+      const totales = totalesNacionales(contratosMapa, garantiasMapa, f);
+      return { totales, data };
+    }, CACHE_TTLS.geo);
   }
 }
