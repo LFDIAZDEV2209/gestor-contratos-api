@@ -1,0 +1,14 @@
+node_modules
+.next
+.git
+.env*
+.aws
+.agents
+.codex
+*.pem
+*.key
+scratch
+test-results
+playwright-report
+scripts
+*.md

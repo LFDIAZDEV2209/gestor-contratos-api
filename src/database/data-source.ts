@@ -21,4 +21,9 @@ export default new DataSource({
   namingStrategy: new SnakeNamingStrategy(),
   migrations: [`${__dirname}/migrations/*{.ts,.js}`],
   logging: ['error'],
+  // TLS contra RDS en producción (rds.force_ssl=1 en PG16 de RDS). TODO(AWS): CA bundle.
+  ssl:
+    (process.env.NODE_ENV ?? 'development') === 'production'
+      ? { rejectUnauthorized: false }
+      : undefined,
 });

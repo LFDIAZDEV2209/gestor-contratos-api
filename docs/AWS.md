@@ -3,6 +3,8 @@
 > Región: `us-east-1` · Cuenta: `933629770820` · Prefix de recursos: `nexogc-`
 > Scripts idempotentes en `infra/aws/*.ps1` (IaC-lite; migración futura a Terraform documentada en ADR-005).
 
+> Estado de continuidad: [CONTINUIDAD_OPENCODE.md](CONTINUIDAD_OPENCODE.md). El dominio utilizado por los scripts posteriores es `sevensave.com.co` (`api.sevensave.com.co`), no la propuesta `nexogc.fyatech.com`. El frontend es Next SSR y requiere ECS/EC2; S3 no ejecuta el frontend. Verificación de solo lectura: `infra/aws/14-verify-prod.ps1`.
+
 ## Arquitectura de red (VPC `nexogc-vpc-prod` 10.40.0.0/16, 2 AZs)
 
 ```
@@ -48,6 +50,12 @@ Internet → CloudFront (opcional, fase 2) → WAF (nexogc-waf-prod) → ALB (ne
 - Secrets inyectados desde Secrets Manager (DB_USER, DB_PASSWORD, JWT_SECRET, VALKEY_PASSWORD) — **jamás** en imagen ni código.
 - Health check del contenedor: `GET /api/health/live`; grace period 90 s en el service.
 - Estadoless: listo para auto scaling (target tracking CPU 60%) y rolling deployments.
+
+### Compute: Frontend Next SSR (`nexogc-front-svc`)
+- Servicio **separado** en el mismo cluster `nexogc-cluster` — 2 tasks Fargate, 0.5 vCPU / 1 GB, awsvpc, sin IP pública, subredes app (privadas).
+- Taskdef `nexogc-front`: imagen `nexogc/front:latest` en ECR (construida con `infra/aws/Dockerfile.frontend` sobre el repo del frontend).
+- Target group `nexogc-tg-front` (puerto 3000, health check `/` HTTP 200-399), unido al ALB mediante regla por hostname.
+- Logs en `/nexogc/front-prod`. Estadoless; listo para auto scaling como la API.
 
 ### Base de datos: RDS PostgreSQL 16 (`nexogc-db-prod`)
 - `db.t4g.small` single-AZ (el usuario definió ~10 usuarios concurrentes; el cuello esperado es volumen de datos, no conexiones).
@@ -106,7 +114,7 @@ El script `09-ecs-deploy.ps1` replica ese flujo manualmente (build, push, regist
 
 ## Pendientes de infraestructura
 - [ ] Suscribir email del equipo al SNS `nexogc-alarms`.
-- [ ] ACM certificado + Route53 (domain `nexogc.fyatech.com` por confirmar) → listener HTTPS 443 en ALB y redirect 80→443.
+- [ ] Ejecutar `infra/aws/15-https-listener.ps1` cuando ACM esté `ISSUED` (requiere publicar registros DNS en GoDaddy: ver `docs/CONTINUIDAD_OPENCODE.md`).
 - [ ] CloudFront delante del ALB (opcional; WAF también aplica ahí si se mueve) + OAC para S3 assets del front.
 - [ ] ECS auto scaling policies + task revision con registros CloudWatch.
 - [ ] Rotación automática de secrets.
@@ -130,3 +138,4 @@ powershell -File infra\aws\07-waf-alb.ps1        # WAF (count) + ALB + TG + list
 powershell -File infra\aws\08-alarms.ps1         # SNS + billing + alarmas
 powershell -File infra\aws\09-ecs-deploy.ps1     # build + push ECR + taskdef + service
 ```
+> Extra frontend SSR: imagen con `infra/aws/Dockerfile.frontend` (contexto del repo del front), taskdef `nexogc-front`, TG `nexogc-tg-front` (:3000). Listener HTTPS + reglas api/admin + redirect 80→301: `infra/aws/15-https-listener.ps1` (solo con ACM `ISSUED`).

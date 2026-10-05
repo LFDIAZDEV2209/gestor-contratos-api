@@ -1,12 +1,14 @@
 # Estado del proyecto — nexo-gestor-contratos (para futuros agentes)
 
-> Última actualización: 2026-10-05 · Sesión: backend NestJS + infra AWS
+> Última actualización: 2026-10-05 · Sesión: backend + frontend SSR en AWS (despliegue completo)
+
+> Continuidad: ver [CONTINUIDAD_OPENCODE.md](CONTINUIDAD_OPENCODE.md) para la evidencia del último despliegue de OpenCode y los pendientes de HTTPS. El listado siguiente contiene planificación histórica; no sustituye una comprobación actual de AWS. Frontend Next SSR: ejecución en ECS/EC2, S3 reservado para documentos/assets.
 
 ## Qué existe y dónde
 
 | Pieza | Estado | Ubicación |
 |---|---|---|
-| Frontend (Next.js, datos mock) | **INTACTO** (no tocar hasta fase de conexión) | `..\gestor-contratos-front` |
+| Frontend (Next.js, datos mock) | **Desplegado SSR en ECS** (mock intacto; conexión con backend pendiente) | `..\gestor-contratos-front` + `infra/aws/Dockerfile.frontend` (repo API) |
 | Backend NestJS 11 + TypeORM | Funcional, 28 tablas + motores + 19 reportes + RBAC | `gestor-contratos-api/src` |
 | Análisis funcional del front | Completo (211 KB, matriz por vista + GAPs) | `docs/ANALISIS_FRONTEND.md` |
 | Modelo de datos + índices + MVs | Doc + migración aplicada | `docs/BASE_DATOS.md` + `src/database/migrations/1727910000000-...` |
@@ -25,14 +27,13 @@
 
 ## Pendientes priorizados (siguiente sesión)
 
-1. **Conexión frontend↔backend**: cambiar los mocks del front por fetch a `http://localhost:4000/api` (o ALB DNS) según matriz de `docs/ANALISIS_FRONTEND.md` §2 y GAPs §7.
-2. **Migración prod** (`10-migrate-prod.ps1`) tras crear el service; luego health check del ALB.
-3. **HTTPS**: ACM + Route53 + listener 443 + redirect 80→443 (requiere dominio del cliente).
-4. **Suscribir email** al SNS `nexogc-alarms`.
-5. **Storage S3 real** para documentos (reemplazar disco local: `documents.service` usa UPLOAD_DIR; abstracción pendiente, ver ADR pendiente).
-6. **SSO OIDC** (fase 1 del plan del cliente).
-7. **Rotación de secrets** + Multi-AZ RDS cuando cargue producción real.
-8. **Terraform formal** (opcional; los scripts PS1 ya son idempotentes y documentados).
+1. **HTTPS + dominio (bloqueado en GoDaddy)**: publicar en el panel de GoDaddy (DNS autoritativo) los registros indicados en `docs/CONTINUIDAD_OPENCODE.md`; al confirmar ACM `ISSUED` ejecutar `infra/aws/15-https-listener.ps1` (listener 443 + reglas por hostname + redirect 80→301).
+2. **Conexión frontend↔backend**: cambiar los mocks del front por fetch a la API según matriz de `docs/ANALISIS_FRONTEND.md` §2 y GAPs §7. El backend ya bloquea `POST /api/auth/login` en producción con `AUTH_SSO_PENDING` (C01) hasta conectar SSO/OIDC.
+3. **Suscribir email** al SNS `nexogc-alarms` (también disparó alarmas `nexogc-billing-60usd` y `nexogc-valkey-high-cpu` en INSUFFICIENT_DATA por falta de suscriptor).
+4. **Storage S3 real** para documentos (reemplazar disco local: `documents.service` usa UPLOAD_DIR; abstracción pendiente, ver ADR pendiente).
+5. **SSO OIDC** (fase 1 del plan del cliente) — prerrequisito para exponer login en producción.
+6. **Rotación de secrets** + Multi-AZ RDS cuando cargue producción real.
+7. **Terraform formal** (opcional; los scripts PS1 ya son idempotentes y documentados).
 
 ## Reglas del proyecto (resumen operativo)
 

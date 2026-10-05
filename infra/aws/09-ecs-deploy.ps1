@@ -73,7 +73,7 @@ $td = @{
         @{ name = "CACHE_DRIVER"; value = "valkey" },
         @{ name = "S3_BUCKET"; value = "nexogc-contratos-docs-933629770820" },
         @{ name = "AWS_REGION"; value = $region },
-        @{ name = "CORS_ORIGIN"; value = "https://nexogc.fyatech.com,http://localhost:3000" },
+        @{ name = "CORS_ORIGIN"; value = "https://admin.sevensave.com.co" },
         @{ name = "ALERT_CRON"; value = "0 6 * * *" },
         @{ name = "UPLOAD_DIR"; value = "/app/data/uploads" }
       )
