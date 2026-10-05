@@ -1,16 +1,25 @@
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { Logger } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { AppModule } from './app.module';
 import { ApiError } from './common/exceptions/api-exception';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { CorrelationIdMiddleware } from './common/observability/correlation-id.middleware';
+import { HttpLoggingInterceptor } from './common/observability/http-logging.interceptor';
+import { nestLogger } from './common/observability/logger';
+import { configureTypeOrmObservability } from './common/observability/typeorm-logger';
 import 'reflect-metadata';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule, { bufferLogs: false });
+  const app = await NestFactory.create(AppModule, { bufferLogs: false, logger: nestLogger });
 
   app.setGlobalPrefix('api');
+  app.enableShutdownHooks();
+  const correlationIdMiddleware = new CorrelationIdMiddleware();
+  app.use(correlationIdMiddleware.use.bind(correlationIdMiddleware));
+  app.useGlobalInterceptors(new HttpLoggingInterceptor());
+  configureTypeOrmObservability(app.get(DataSource));
   app.enableCors({
     origin: (process.env.CORS_ORIGIN ?? 'http://localhost:3000').split(',').map((s) => s.trim()),
     credentials: true,
