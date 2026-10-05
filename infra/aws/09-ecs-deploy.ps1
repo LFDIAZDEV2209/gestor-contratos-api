@@ -37,8 +37,13 @@ $tg = aws elbv2 describe-target-groups --region $region --names nexogc-tg-api --
 $vpcId = aws ec2 describe-vpcs --region us-east-1 --filters Name=tag:Project,Values=nexo-gestor-contratos --query "Vpcs[0].VpcId" --output text
 $appA = aws ec2 describe-subnets --region $region --filters Name=tag:Name,Values=nexogc-app-a --query "Subnets[0].SubnetId" --output text
 $appB = aws ec2 describe-subnets --region $region --filters Name=tag:Name,Values=nexogc-app-b --query "Subnets[0].SubnetId" --output text
-$execSecretDb = "arn:aws:secretsmanager:$region`:$account:secret:nexogc/prod/db-??????"
-$execSecretJwt = "arn:aws:secretsmanager:$region`:$account:secret:nexogc/prod/jwt-??????"
+$appA = aws ec2 describe-subnets --region $region --filters Name=tag:Name,Values=nexogc-app-a --query "Subnets[0].SubnetId" --output text
+$appB = aws ec2 describe-subnets --region $region --filters Name=tag:Name,Values=nexogc-app-b --query "Subnets[0].SubnetId" --output text
+# ARNs REALES de los secrets (el sufijo aleatorio lo genera Secrets Manager)
+$arnDb = aws secretsmanager describe-secret --region $region --secret-id nexogc/prod/db --query "ARN" --output text
+$arnJwt = aws secretsmanager describe-secret --region $region --secret-id nexogc/prod/jwt --query "ARN" --output text
+$arnValkey = aws secretsmanager describe-secret --region $region --secret-id nexogc/prod/valkey --query "ARN" --output text
+Write-Host "ARNs: db=$arnDb jwt=$arnJwt valkey=$arnValkey"
 
 # --- 4) Task definition ---
 $td = @{
@@ -60,10 +65,10 @@ $td = @{
         @{ name = "NODE_ENV"; value = "production" },
         @{ name = "PORT"; value = "4000" },
         @{ name = "DB_HOST"; value = $dbEndpoint },
-        @{ name = "DB_PORT"; value = $dbPort },
+        @{ name = "DB_PORT"; value = "$dbPort" },
         @{ name = "DB_NAME"; value = "gestor_contratos" },
         @{ name = "VALKEY_HOST"; value = $valkeyEndpoint },
-        @{ name = "VALKEY_PORT"; value = $valkeyPort },
+        @{ name = "VALKEY_PORT"; value = "$valkeyPort" },
         @{ name = "VALKEY_TLS"; value = "true" },
         @{ name = "CACHE_DRIVER"; value = "valkey" },
         @{ name = "S3_BUCKET"; value = "nexogc-contratos-docs-933629770820" },
@@ -73,10 +78,10 @@ $td = @{
         @{ name = "UPLOAD_DIR"; value = "/app/data/uploads" }
       )
       secrets = @(
-        @{ name = "DB_USER"; valueFrom = "$execSecretDb:username::" },
-        @{ name = "DB_PASSWORD"; valueFrom = "$execSecretDb:password::" },
-        @{ name = "JWT_SECRET"; valueFrom = "$execSecretJwt:jwt_secret::" },
-        @{ name = "VALKEY_PASSWORD"; valueFrom = "arn:aws:secretsmanager:$region`:$account:secret:nexogc/prod/valkey-??????:auth_token::" }
+        @{ name = "DB_USER"; valueFrom = ($arnDb + ":username::") },
+        @{ name = "DB_PASSWORD"; valueFrom = ($arnDb + ":password::") },
+        @{ name = "JWT_SECRET"; valueFrom = ($arnJwt + ":jwt_secret::") },
+        @{ name = "VALKEY_PASSWORD"; valueFrom = ($arnValkey + ":auth_token::") }
       )
       healthCheck = @{ command = @("CMD-SHELL", "wget -qO- http://127.0.0.1:4000/api/health/live || exit 1"); interval = 30; timeout = 5; retries = 3; startPeriod = 60 }
     }
