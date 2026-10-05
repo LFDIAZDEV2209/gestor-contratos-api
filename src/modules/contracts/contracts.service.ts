@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ContractEntity } from './entities/contract.entity';
@@ -20,6 +20,7 @@ import { ContractBase, ContractCtx, ParametrosAlerta } from '../../engines/types
 import { DEPARTAMENTOS } from '../../engines/map.engine';
 import { CrearContratoDto, FiltrosContratos } from './contracts.dto';
 import { ConfigService } from '@nestjs/config';
+import { CACHE_SERVICE, CacheService, invalidateReadModels } from '../../cache/cache.service';
 
 export type FilaContrato = ContractEntity & {
   metricas: Metricas & {
@@ -41,6 +42,7 @@ export class ContractsService {
     private readonly settings: SettingsService,
     private readonly audit: AuditService,
     private readonly config: ConfigService,
+    @Inject(CACHE_SERVICE) private readonly cache: CacheService,
   ) {}
 
   private async parametros(): Promise<ParametrosAlerta> {
@@ -155,6 +157,7 @@ export class ContractsService {
     const c = await this.repo.save(
       this.repo.create({ ...dto, numero, estado: dto.estado ?? 'Borrador', version: 1 }),
     );
+    await invalidateReadModels(this.cache);
     await this.audit.registrar(ctx, [{
       contractId: c.id, modulo: 'Contratos', accion: 'CREAR', nuevo: `${c.numero} (${c.contratista})`,
     }]);
@@ -193,6 +196,7 @@ export class ContractsService {
     if (!res.affected) {
       throw new Conflicto('La versión del registro está desactualizada. Recargue el registro y vuelva a intentarlo.', ['version']);
     }
+    await invalidateReadModels(this.cache);
     await this.audit.registrar(
       ctx,
       entradasPorCampos(prev as unknown as Record<string, unknown>, c as unknown as Record<string, unknown>, Object.keys(cambios), { contractId: c.id, modulo: 'Contratos', accion: 'EDITAR' }),
@@ -208,6 +212,7 @@ export class ContractsService {
     c.estado = 'Anulado';
     c.motivoAnulacion = motivo;
     await this.repo.save(c);
+    await invalidateReadModels(this.cache);
     await this.audit.registrar(ctx, [{ contractId: c.id, modulo: 'Contratos', accion: 'ANULAR', obs: motivo }]);
     return this.obtener(id);
   }

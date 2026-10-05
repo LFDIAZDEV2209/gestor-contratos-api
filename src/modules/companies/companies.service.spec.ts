@@ -1,3 +1,4 @@
+import { MemoryCacheService } from '../../cache/memory-cache.service';
 import { CompaniesService } from './companies.service';
 import { CompanyEntity } from './companies.entity';
 import { ContractEntity } from '../contracts/entities/contract.entity';
@@ -7,6 +8,7 @@ import { createMockRepo, mockAuditService, mockReqContext } from '../../../test/
 
 describe('CompaniesService', () => {
   let service: CompaniesService;
+  let cache: MemoryCacheService;
   let companyRepo: ReturnType<typeof createMockRepo<CompanyEntity>>;
   let contractsRepo: ReturnType<typeof createMockRepo<ContractEntity>>;
   let execsRepo: ReturnType<typeof createMockRepo<ExecEntity>>;
@@ -32,11 +34,15 @@ describe('CompaniesService', () => {
     execsRepo = createMockRepo<ExecEntity>();
     audit = mockAuditService();
 
+    cache = new MemoryCacheService();
+    jest.spyOn(cache, 'delByPattern');
+
     service = new CompaniesService(
       companyRepo as any,
       contractsRepo as any,
       execsRepo as any,
       audit as any,
+      cache,
     );
   });
 
@@ -135,6 +141,8 @@ describe('CompaniesService', () => {
       };
 
       const res = await service.crear(dto, ctx);
+      expect(cache.delByPattern).toHaveBeenCalledWith('geo:*');
+      expect(cache.delByPattern).toHaveBeenCalledWith('reports:*');
 
       expect(res.id).toBeDefined();
       expect(res.nit).toBe('901.999.888-1');
@@ -168,6 +176,8 @@ describe('CompaniesService', () => {
 
       const dto = { version: 1, razon: 'Razón Modificada' };
       const res = await service.actualizar('EMP-01', dto, 1, ctx);
+      expect(cache.delByPattern).toHaveBeenCalledWith('geo:*');
+      expect(cache.delByPattern).toHaveBeenCalledWith('reports:*');
 
       expect(companyRepo.update).toHaveBeenCalledWith(
         { id: 'EMP-01', version: 1 },
@@ -201,6 +211,8 @@ describe('CompaniesService', () => {
       companyRepo.update.mockResolvedValueOnce({ affected: 1, raw: [], generatedMaps: [] });
 
       const res = await service.anular('EMP-01', 'Fusión por absorción', ctx);
+      expect(cache.delByPattern).toHaveBeenCalledWith('geo:*');
+      expect(cache.delByPattern).toHaveBeenCalledWith('reports:*');
 
       expect(res.estado).toBe('Inactiva');
       expect(res.motivoAnulacion).toBe('Fusión por absorción');

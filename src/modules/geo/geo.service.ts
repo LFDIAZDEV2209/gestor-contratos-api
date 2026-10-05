@@ -68,7 +68,12 @@ export class GeoService {
   }
 
   async departamentos(filtros: { metric?: string; measure?: string; aseguradora?: string; estado?: string; companyId?: string }) {
-    return this.cache.wrap(`geo:departamentos:${JSON.stringify(filtros)}`, async () => {
+    const key = JSON.stringify({
+      metric: filtros.metric ?? 'contratos', measure: filtros.measure ?? 'n',
+      aseguradora: filtros.aseguradora ?? null, estado: this.grupoDeEstado(filtros.estado),
+      companyId: filtros.companyId ?? null,
+    });
+    return this.cache.wrap(`geo:departamentos:${key}`, async () => {
       const { contratosMapa, garantiasMapa, f } = await this.insumos(filtros);
       const data = agregarPorDepto(contratosMapa, garantiasMapa, f);
       const totales = totalesNacionales(contratosMapa, garantiasMapa, f);
@@ -77,7 +82,11 @@ export class GeoService {
   }
 
   async regiones(filtros: { aseguradora?: string; estado?: string; companyId?: string }) {
-    return this.cache.wrap(`geo:regiones:${JSON.stringify(filtros)}`, async () => {
+    const key = JSON.stringify({
+      aseguradora: filtros.aseguradora ?? null, estado: this.grupoDeEstado(filtros.estado),
+      companyId: filtros.companyId ?? null,
+    });
+    return this.cache.wrap(`geo:regiones:${key}`, async () => {
       const { contratosMapa, garantiasMapa, f } = await this.insumos(filtros);
       const data = agregarPorRegion(contratosMapa, garantiasMapa, f);
       const totales = totalesNacionales(contratosMapa, garantiasMapa, f);

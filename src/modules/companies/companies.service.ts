@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { CompanyEntity } from './companies.entity';
@@ -13,6 +13,7 @@ import { AuditService } from '../audit/audit.service';
 import { valorActualDe } from '../../engines/metrics.engine';
 import { diffDias } from '../../common/dates';
 import { ESTADOS_CERRADOS } from '../../engines/types';
+import { CACHE_SERVICE, CacheService, invalidateReadModels } from '../../cache/cache.service';
 
 export interface IndicadoresEmpresa {
   contratos: number;
@@ -30,6 +31,7 @@ export class CompaniesService {
     @InjectRepository(ContractEntity) private readonly contracts: Repository<ContractEntity>,
     @InjectRepository(ExecEntity) private readonly execs: Repository<ExecEntity>,
     private readonly audit: AuditService,
+    @Inject(CACHE_SERVICE) private readonly cache: CacheService,
   ) {}
 
   async listar(query: Record<string, unknown>): Promise<{ data: CompanyEntity[]; total: number }> {
@@ -92,6 +94,7 @@ export class CompaniesService {
       fechaCreacion: new Date().toISOString().slice(0, 10),
       version: 1,
     }));
+    await invalidateReadModels(this.cache);
     await this.audit.registrar(ctx, [{ modulo: 'Empresas', accion: 'CREAR', nuevo: `${c.razon} (NIT ${c.nit})` }]);
     return c;
   }
@@ -112,6 +115,7 @@ export class CompaniesService {
     if (!res.affected) {
       throw new Conflicto('La versión del registro está desactualizada. Recargue el registro y vuelva a intentarlo.', ['version']);
     }
+    await invalidateReadModels(this.cache);
     await this.audit.registrar(
       ctx,
       entradasPorCampos(prev as unknown as Record<string, unknown>, c as unknown as Record<string, unknown>, Object.keys(cambios), { modulo: 'Empresas', accion: 'EDITAR' }),
@@ -132,6 +136,7 @@ export class CompaniesService {
     if (!res.affected) {
       throw new Conflicto('La versión del registro está desactualizada. Recargue el registro y vuelva a intentarlo.', ['version']);
     }
+    await invalidateReadModels(this.cache);
     await this.audit.registrar(ctx, [{
       modulo: 'Empresas', accion: 'ANULAR', campo: 'estado', anterior: 'Activa', nuevo: 'Inactiva', obs: motivo,
     }]);

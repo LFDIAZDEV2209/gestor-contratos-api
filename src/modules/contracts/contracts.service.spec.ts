@@ -1,3 +1,4 @@
+import { MemoryCacheService } from '../../cache/memory-cache.service';
 import { ContractsService } from './contracts.service';
 import { ContractEntity } from './entities/contract.entity';
 import { PaymentEntity } from './entities/payments.entity';
@@ -10,6 +11,7 @@ import { ConfigService } from '@nestjs/config';
 
 describe('ContractsService', () => {
   let service: ContractsService;
+  let cache: MemoryCacheService;
   let contractRepo: ReturnType<typeof createMockRepo<ContractEntity>>;
   let pagosRepo: ReturnType<typeof createMockRepo<PaymentEntity>>;
   let actasRepo: ReturnType<typeof createMockRepo<ActaEntity>>;
@@ -62,6 +64,9 @@ describe('ContractsService', () => {
       get: jest.fn().mockReturnValue(25),
     } as unknown as ConfigService;
 
+    cache = new MemoryCacheService();
+    jest.spyOn(cache, 'delByPattern');
+
     service = new ContractsService(
       contractRepo as any,
       pagosRepo as any,
@@ -71,6 +76,7 @@ describe('ContractsService', () => {
       settings as any,
       audit as any,
       config,
+      cache,
     );
   });
 
@@ -96,6 +102,8 @@ describe('ContractsService', () => {
       contractRepo.findOne.mockResolvedValueOnce(savedContract); // Para el obtener(id)
 
       const resultado = await service.crear(dto as any, ctx, false);
+      expect(cache.delByPattern).toHaveBeenCalledWith('geo:*');
+      expect(cache.delByPattern).toHaveBeenCalledWith('reports:*');
 
       expect(contractRepo.findOne).toHaveBeenCalledWith({ where: { numero: dto.numero } });
       expect(contractRepo.save).toHaveBeenCalled();
@@ -221,6 +229,8 @@ describe('ContractsService', () => {
       };
 
       const res = await service.actualizar('CT-01', dto as any, ctx, false);
+      expect(cache.delByPattern).toHaveBeenCalledWith('geo:*');
+      expect(cache.delByPattern).toHaveBeenCalledWith('reports:*');
 
       expect(contractRepo.update).toHaveBeenCalledWith(
         { id: 'CT-01', version: 2 },
@@ -249,6 +259,8 @@ describe('ContractsService', () => {
       });
 
       const res = await service.anular('CT-01', 'Terminación anticipada bilateral', ctx);
+      expect(cache.delByPattern).toHaveBeenCalledWith('geo:*');
+      expect(cache.delByPattern).toHaveBeenCalledWith('reports:*');
 
       expect(contractRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({

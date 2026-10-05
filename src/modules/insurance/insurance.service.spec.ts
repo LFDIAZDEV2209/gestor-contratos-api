@@ -1,3 +1,4 @@
+import { MemoryCacheService } from '../../cache/memory-cache.service';
 import { InsuranceService } from './insurance.service';
 import { GuaranteeEntity } from '../contracts/entities/guarantees.entity';
 import { CupoEntity } from '../contracts/entities/quotas.entity';
@@ -12,6 +13,7 @@ import {
 
 describe('InsuranceService', () => {
   let service: InsuranceService;
+  let cache: MemoryCacheService;
   let garsRepo: ReturnType<typeof createMockRepo<GuaranteeEntity>>;
   let cuposRepo: ReturnType<typeof createMockRepo<CupoEntity>>;
   let contractsRepo: ReturnType<typeof createMockRepo<ContractEntity>>;
@@ -64,6 +66,9 @@ describe('InsuranceService', () => {
       idsConAseguradora: jest.fn().mockResolvedValue([]),
     };
 
+    cache = new MemoryCacheService();
+    jest.spyOn(cache, 'delByPattern');
+
     service = new InsuranceService(
       garsRepo as any,
       cuposRepo as any,
@@ -71,6 +76,7 @@ describe('InsuranceService', () => {
       loader,
       audit as any,
       roles as any,
+      cache,
     );
   });
 
@@ -200,6 +206,8 @@ describe('InsuranceService', () => {
       };
 
       const res = await service.crearGarantia(dtoPoliza, ctx, true);
+      expect(cache.delByPattern).toHaveBeenCalledWith('geo:*');
+      expect(cache.delByPattern).toHaveBeenCalledWith('reports:*');
       expect(res).toBeDefined();
       expect(garsRepo.save).toHaveBeenCalled();
       expect(audit.registrar).toHaveBeenCalled();
@@ -238,6 +246,8 @@ describe('InsuranceService', () => {
       } as any);
 
       const res = await service.aprobarGarantia('GR-01', ctx);
+      expect(cache.delByPattern).toHaveBeenCalledWith('geo:*');
+      expect(cache.delByPattern).toHaveBeenCalledWith('reports:*');
 
       expect(garsRepo.update).toHaveBeenCalledWith(
         { id: 'GR-01', version: 1 },
@@ -263,6 +273,8 @@ describe('InsuranceService', () => {
       } as any);
 
       const res = await service.anularGarantia('GR-01', 'Póliza revocada', ctx);
+      expect(cache.delByPattern).toHaveBeenCalledWith('geo:*');
+      expect(cache.delByPattern).toHaveBeenCalledWith('reports:*');
 
       expect(garsRepo.update).toHaveBeenCalledWith(
         { id: 'GR-01', version: 1 },
@@ -310,6 +322,8 @@ describe('InsuranceService', () => {
       } as any);
 
       const res = await service.anularCupo('CP-01', 'Cierre de línea', ctx);
+      expect(cache.delByPattern).toHaveBeenCalledWith('geo:*');
+      expect(cache.delByPattern).toHaveBeenCalledWith('reports:*');
 
       expect(cuposRepo.update).toHaveBeenCalled();
       expect(res.estado).toBe('Anulado');

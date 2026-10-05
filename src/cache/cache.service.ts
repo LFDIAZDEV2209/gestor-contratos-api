@@ -9,6 +9,11 @@ export interface CacheService {
 
 export const CACHE_SERVICE = Symbol('CACHE_SERVICE');
 
+/** Shared read models depend on all four mutation services. */
+export async function invalidateReadModels(cache: CacheService): Promise<void> {
+  await Promise.all([cache.delByPattern('geo:*'), cache.delByPattern('reports:*')]);
+}
+
 export const CACHE_TTLS = {
   settings: 10 * 60,
   geo: 15 * 60,

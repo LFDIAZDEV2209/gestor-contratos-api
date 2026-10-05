@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { GuaranteeEntity } from '../contracts/entities/guarantees.entity';
@@ -15,6 +15,7 @@ import { ContractContextLoader } from '../contracts/contract-context.loader';
 import { cupoStats, CupoStats } from '../../engines/cupo.engine';
 import { reglasDeCupo } from '../../engines/seguros.engine';
 import { redondear1 } from '../../common/dates';
+import { CACHE_SERVICE, CacheService, invalidateReadModels } from '../../cache/cache.service';
 
 export interface CupoConStats extends CupoEntity {
   calculado: CupoStats;
@@ -45,6 +46,7 @@ export class InsuranceService {
     private readonly loader: ContractContextLoader,
     private readonly audit: AuditService,
     private readonly roles: RolesService,
+    @Inject(CACHE_SERVICE) private readonly cache: CacheService,
   ) {}
 
   /** GET /guarantees con filtros. */
@@ -75,6 +77,7 @@ export class InsuranceService {
       throw new Validacion('El vencimiento de la póliza no puede ser anterior a su inicio.', ['fechaVenc']);
     }
     const g = await this.gars.save(this.gars.create({ ...dto, id: newId('GR'), version: 1 }));
+    await invalidateReadModels(this.cache);
     await this.audit.registrar(ctx, [{
       contractId: g.contractId, modulo: 'Garantías', accion: 'CREAR', nuevo: `${g.tipo} ${g.poliza} (${g.aseguradora})`,
     }]);
@@ -109,6 +112,7 @@ export class InsuranceService {
     if (!res.affected) {
       throw new Conflicto('La versión del registro está desactualizada. Recargue el registro y vuelva a intentarlo.', ['version']);
     }
+    await invalidateReadModels(this.cache);
     await this.audit.registrar(
       ctx,
       entradasPorCampos(prev as unknown as Record<string, unknown>, g as unknown as Record<string, unknown>, Object.keys(cambios), { contractId: g.contractId, modulo: 'Garantías', accion: 'EDITAR' }),
@@ -126,6 +130,7 @@ export class InsuranceService {
       { id: g.id, version: g.version },
       { estado: 'Aprobada', version: g.version + 1 } as never,
     );
+    await invalidateReadModels(this.cache);
     await this.audit.registrar(ctx, [{
       contractId: g.contractId, modulo: 'Garantías', accion: 'APROBAR', campo: 'estado',
       anterior: g.estado, nuevo: 'Aprobada',
@@ -141,6 +146,7 @@ export class InsuranceService {
       { id: g.id, version: g.version },
       { estado: 'Anulada', motivoAnulacion: motivo, version: g.version + 1 } as never,
     );
+    await invalidateReadModels(this.cache);
     await this.audit.registrar(ctx, [{
       contractId: g.contractId, modulo: 'Garantías', accion: 'ANULAR', obs: motivo,
     }]);
@@ -158,6 +164,7 @@ export class InsuranceService {
       throw new Validacion('La vigencia final del cupo no puede ser anterior a la inicial.', ['fechaVenc']);
     }
     const cp = await this.cupos.save(this.cupos.create({ ...dto, id: newId('CP'), version: 1 }));
+    await invalidateReadModels(this.cache);
     await this.audit.registrar(ctx, [{ modulo: 'Cupos', accion: 'CREAR', nuevo: `${cp.numero} (${cp.aseguradora})` }]);
     return cp;
   }
@@ -193,6 +200,7 @@ export class InsuranceService {
     if (!res.affected) {
       throw new Conflicto('La versión del registro está desactualizada. Recargue el registro y vuelva a intentarlo.', ['version']);
     }
+    await invalidateReadModels(this.cache);
     await this.audit.registrar(
       ctx,
       entradasPorCampos(cp as unknown as Record<string, unknown>, cp as unknown as Record<string, unknown>, Object.keys(cambios), { modulo: 'Cupos', accion: 'EDITAR' }),
@@ -210,6 +218,7 @@ export class InsuranceService {
       { id: cp.id, version: cp.version },
       { estado: 'Anulado', motivoAnulacion: motivo, version: cp.version + 1 } as never,
     );
+    await invalidateReadModels(this.cache);
     await this.audit.registrar(ctx, [{ modulo: 'Cupos', accion: 'ANULAR', obs: motivo }]);
     return this.cupos.findOneOrFail({ where: { id } });
   }

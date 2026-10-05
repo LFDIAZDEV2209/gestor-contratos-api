@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, IsNull, ObjectLiteral, Repository } from 'typeorm';
 import { ContractEntity } from './entities/contract.entity';
@@ -23,6 +23,7 @@ import { SettingsService } from '../settings/settings.service';
 import { RolesService } from '../roles/roles.service';
 import { valorActualDe } from '../../engines/metrics.engine';
 import { efectoModificacion } from '../../engines/modification.engine';
+import { CACHE_SERVICE, CacheService, invalidateReadModels } from '../../cache/cache.service';
 
 /**
  * CRUD genérico para las colecciones hijas del contrato con reglas específicas
@@ -51,6 +52,7 @@ export class ChildCollectionsService {
     private readonly audit: AuditService,
     private readonly settings: SettingsService,
     private readonly roles: RolesService,
+    @Inject(CACHE_SERVICE) private readonly cache: CacheService,
   ) {
     const mapa: [string, Repository<ObjectLiteral>][] = [
       ['subcontracts', subsRepo as Repository<ObjectLiteral>],
@@ -117,12 +119,15 @@ export class ChildCollectionsService {
       throw new WarningRequiresConfirmation('Advertencia: el registro tiene inconsistencias aceptables.', advertencias);
     }
     if (coleccion === 'modifications') {
-      return this.crearModificacion(contrato, dto, ctx, force);
+      const result = await this.crearModificacion(contrato, dto, ctx, force);
+      await invalidateReadModels(this.cache);
+      return result;
     }
     const repo = this.repoDe(coleccion);
     const datos = { ...dto };
     this.prepararGuardado(coleccion, datos, null);
     const ent = await repo.save(repo.create({ ...datos, id: newId(def.prefijo), version: 1 }));
+    await invalidateReadModels(this.cache);
     await this.audit.registrar(ctx, [{
       contractId: contrato.id, modulo: def.modulo, accion: 'CREAR',
       nuevo: `${(ent as unknown as { id: string }).id}`,
@@ -163,6 +168,7 @@ export class ChildCollectionsService {
     if (!res.affected) {
       throw new Conflicto('La versión del registro está desactualizada. Recargue el registro y vuelva a intentarlo.', ['version']);
     }
+    await invalidateReadModels(this.cache);
     const cambios = Object.keys(datos).filter((k) => k !== 'contractId');
     await this.audit.registrar(
       ctx,
@@ -191,6 +197,7 @@ export class ChildCollectionsService {
       motivoAnulacion: motivo,
       version: versionActual + 1,
     } as never);
+    await invalidateReadModels(this.cache);
     await this.audit.registrar(ctx, [{
       contractId: (e.contractId as string) ?? null,
       modulo: def.modulo, accion: 'ANULAR', obs: motivo,

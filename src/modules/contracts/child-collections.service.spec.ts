@@ -1,3 +1,4 @@
+import { MemoryCacheService } from '../../cache/memory-cache.service';
 import { ChildCollectionsService } from './child-collections.service';
 import { ContractEntity } from './entities/contract.entity';
 import { SubcontractEntity } from './entities/subcontracts.entity';
@@ -28,6 +29,7 @@ import {
 
 describe('ChildCollectionsService', () => {
   let service: ChildCollectionsService;
+  let cache: MemoryCacheService;
   let contractsRepo: ReturnType<typeof createMockRepo<ContractEntity>>;
   let subsRepo: ReturnType<typeof createMockRepo<SubcontractEntity>>;
   let oblsRepo: ReturnType<typeof createMockRepo<ObligationEntity>>;
@@ -85,6 +87,9 @@ describe('ChildCollectionsService', () => {
 
     contractsRepo.findOne.mockResolvedValue(contratoPadreValido);
 
+    cache = new MemoryCacheService();
+    jest.spyOn(cache, 'delByPattern');
+
     service = new ChildCollectionsService(
       ds as any,
       contractsRepo as any,
@@ -101,6 +106,7 @@ describe('ChildCollectionsService', () => {
       audit as any,
       settings as any,
       roles as any,
+      cache,
     );
   });
 
@@ -147,6 +153,8 @@ describe('ChildCollectionsService', () => {
       };
 
       const res = await service.crear('subcontracts', nuevoSubcontrato, ctx, false);
+      expect(cache.delByPattern).toHaveBeenCalledWith('geo:*');
+      expect(cache.delByPattern).toHaveBeenCalledWith('reports:*');
 
       expect(res).toBeDefined();
       expect(subsRepo.save).toHaveBeenCalled();
@@ -176,6 +184,8 @@ describe('ChildCollectionsService', () => {
       };
 
       const res = await service.crear('subcontracts', nuevoSubcontrato, ctx, false);
+      expect(cache.delByPattern).toHaveBeenCalledWith('geo:*');
+      expect(cache.delByPattern).toHaveBeenCalledWith('reports:*');
       expect(res).toBeDefined();
     });
   });
@@ -200,6 +210,8 @@ describe('ChildCollectionsService', () => {
       };
 
       await service.crear('payments', nuevoPago, ctx, false);
+      expect(cache.delByPattern).toHaveBeenCalledWith('geo:*');
+      expect(cache.delByPattern).toHaveBeenCalledWith('reports:*');
 
       expect(entidadGuardada).toBeDefined();
       expect(entidadGuardada.neto).toBe(11_500_000); // 10M + 1.9M - 0.4M = 11.5M
@@ -224,6 +236,8 @@ describe('ChildCollectionsService', () => {
       };
 
       await service.crear('payments', pagoAprobado, ctx, false);
+      expect(cache.delByPattern).toHaveBeenCalledWith('geo:*');
+      expect(cache.delByPattern).toHaveBeenCalledWith('reports:*');
 
       expect(entidadGuardada.fechaAprob).toBeDefined();
     });
@@ -271,6 +285,8 @@ describe('ChildCollectionsService', () => {
       };
 
       const res = await service.actualizar('payments', 'PG-01', dtoActualizar, ctx, false);
+      expect(cache.delByPattern).toHaveBeenCalledWith('geo:*');
+      expect(cache.delByPattern).toHaveBeenCalledWith('reports:*');
 
       expect(res).toBeDefined();
       expect(paysRepo.update).toHaveBeenCalled();
@@ -320,6 +336,8 @@ describe('ChildCollectionsService', () => {
       };
 
       const res = await service.crear('execs', nuevaExec, ctx, true);
+      expect(cache.delByPattern).toHaveBeenCalledWith('geo:*');
+      expect(cache.delByPattern).toHaveBeenCalledWith('reports:*');
       expect(res).toBeDefined();
       expect(execsRepo.save).toHaveBeenCalled();
     });
@@ -361,6 +379,8 @@ describe('ChildCollectionsService', () => {
       };
 
       const res = await service.crear('modifications', dtoMod, ctx, false);
+      expect(cache.delByPattern).toHaveBeenCalledWith('geo:*');
+      expect(cache.delByPattern).toHaveBeenCalledWith('reports:*');
 
       expect(res).toBeDefined();
       expect(ds.transaction).toHaveBeenCalled();
@@ -404,6 +424,8 @@ describe('ChildCollectionsService', () => {
       execsRepo.update.mockResolvedValueOnce({ affected: 1, raw: [], generatedMaps: [] });
 
       const res = await service.anular('execs', 'EX-01', 'No requerida', ctx);
+      expect(cache.delByPattern).toHaveBeenCalledWith('geo:*');
+      expect(cache.delByPattern).toHaveBeenCalledWith('reports:*');
 
       expect(execsRepo.update).toHaveBeenCalledWith(
         { id: 'EX-01' },
