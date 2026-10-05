@@ -23,6 +23,7 @@ async function bootstrap(): Promise<void> {
   app.enableCors({
     origin: (process.env.CORS_ORIGIN ?? 'http://localhost:3000').split(',').map((s) => s.trim()),
     credentials: true,
+    exposedHeaders: ['x-request-id'],
   });
 
   app.useGlobalPipes(

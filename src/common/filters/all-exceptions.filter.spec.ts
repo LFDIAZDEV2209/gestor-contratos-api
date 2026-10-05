@@ -1,6 +1,9 @@
 import { AllExceptionsFilter } from './all-exceptions.filter';
 import { ArgumentsHost, HttpException, HttpStatus } from '@nestjs/common';
 import { OptimisticLockVersionMismatchError, QueryFailedError } from 'typeorm';
+import { logStructured } from '../observability/logger';
+
+jest.mock('../observability/logger', () => ({ logStructured: jest.fn() }));
 import {
   ApiError,
   WarningRequiresConfirmation,
@@ -16,6 +19,7 @@ describe('AllExceptionsFilter', () => {
   let mockHost: ArgumentsHost;
 
   beforeEach(() => {
+    jest.clearAllMocks();
     filter = new AllExceptionsFilter();
     mockJson = jest.fn();
     mockStatus = jest.fn().mockReturnValue({ json: mockJson });
@@ -129,8 +133,42 @@ describe('AllExceptionsFilter', () => {
     expect(mockJson).toHaveBeenCalledWith({
       error: {
         code: 'INTERNAL_ERROR',
-        message: 'Fallo de conexión a la base de datos',
+        message: 'Error interno del servidor.',
       },
     });
+  });
+
+  it('oculta mensajes y fields de HttpException 500 y correlaciona el diagnóstico redactado', () => {
+    const error = new HttpException({ message: ['password=private-password', 'token=private-token'] }, 500);
+    const host = {
+      switchToHttp: () => ({
+        getResponse: () => ({ status: mockStatus }),
+        getRequest: () => ({ requestId: 'request-500' }),
+      }),
+    } as unknown as ArgumentsHost;
+
+    filter.catch(error, host);
+
+    expect(mockJson).toHaveBeenCalledWith({ error: { code: 'HTTP_500', message: 'Error interno del servidor.' } });
+    expect(logStructured).toHaveBeenCalledWith('error', 'http.request.failed', expect.objectContaining({ requestId: 'request-500', status: 500 }));
+    const diagnostic = JSON.stringify((logStructured as jest.Mock).mock.calls);
+    expect(diagnostic).not.toContain('private-password');
+    expect(diagnostic).not.toContain('private-token');
+  });
+
+  it('oculta los detalles de errores DB desconocidos y conserva SQLSTATE en el log', () => {
+    const error = new QueryFailedError('SELECT private-value', ['private-password'], Object.assign(new Error('private-db-detail'), { code: '08006' }));
+
+    filter.catch(error, mockHost);
+
+    expect(mockStatus).toHaveBeenCalledWith(500);
+    expect(mockJson).toHaveBeenCalledWith({ error: { code: 'INTERNAL_ERROR', message: 'Error interno del servidor.' } });
+    expect(logStructured).toHaveBeenCalledWith('error', 'http.request.failed', expect.objectContaining({
+      diagnostic: expect.objectContaining({ name: 'QueryFailedError', databaseCode: '08006' }),
+    }));
+    const logged = JSON.stringify((logStructured as jest.Mock).mock.calls);
+    expect(logged).not.toContain('private-value');
+    expect(logged).not.toContain('private-password');
+    expect(logged).not.toContain('private-db-detail');
   });
 });
