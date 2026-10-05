@@ -4,7 +4,7 @@ $ErrorActionPreference = "Continue"
 $region = "us-east-1"
 $account = "933629770820"
 $ecrUri = "$account.dkr.ecr.$region.amazonaws.com/nexogc/api"
-$image = "$ecrUri:latest"
+$image = "${ecrUri}:latest"
 $tmp = Join-Path $env:TEMP "nexogc-ecs"
 New-Item -ItemType Directory -Force -Path $tmp | Out-Null
 
