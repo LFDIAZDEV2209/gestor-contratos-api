@@ -27,13 +27,15 @@
 
 ## Pendientes priorizados (siguiente sesión)
 
-1. **HTTPS + dominio (bloqueado en GoDaddy)**: publicar en el panel de GoDaddy (DNS autoritativo) los registros indicados en `docs/CONTINUIDAD_OPENCODE.md`; al confirmar ACM `ISSUED` ejecutar `infra/aws/15-https-listener.ps1` (listener 443 + reglas por hostname + redirect 80→301).
+1. **Suscribir email** al SNS `nexogc-alarms` (también activa métricas reales de billing/Valkey).
 2. **Conexión frontend↔backend**: cambiar los mocks del front por fetch a la API según matriz de `docs/ANALISIS_FRONTEND.md` §2 y GAPs §7. El backend ya bloquea `POST /api/auth/login` en producción con `AUTH_SSO_PENDING` (C01) hasta conectar SSO/OIDC.
-3. **Suscribir email** al SNS `nexogc-alarms` (también disparó alarmas `nexogc-billing-60usd` y `nexogc-valkey-high-cpu` en INSUFFICIENT_DATA por falta de suscriptor).
+3. **SSO OIDC** (fase 1 del plan del cliente) — prerrequisito para habilitar el login en producción.
 4. **Storage S3 real** para documentos (reemplazar disco local: `documents.service` usa UPLOAD_DIR; abstracción pendiente, ver ADR pendiente).
-5. **SSO OIDC** (fase 1 del plan del cliente) — prerrequisito para exponer login en producción.
+5. **CA bundle RDS real** en conexiones TLS (hoy va con `rejectUnauthorized:false`, mitigación transitoria).
 6. **Rotación de secrets** + Multi-AZ RDS cuando cargue producción real.
 7. **Terraform formal** (opcional; los scripts PS1 ya son idempotentes y documentados).
+
+> HTTPS activo con dominios GoDaddy: ver `docs/CONTINUIDAD_OPENCODE.md` (listener 443, redirect 301, reglas por hostname, verificación end-to-end).
 
 ## Reglas del proyecto (resumen operativo)
 

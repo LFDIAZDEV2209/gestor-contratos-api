@@ -33,10 +33,17 @@ if (($rules -split "`t") -notcontains "admin.sevensave.com.co") {
   Write-Host "Regla 443: admin.sevensave.com.co -> tg-front"
 }
 
-# --- Redirect del listener 80 a HTTPS (el default forward por host se pierde al redirigir) ---
+# --- Redirect total HTTP->HTTPS: eliminar reglas por hostname del listener 80 y redirigir todo ---
 $l80 = aws elbv2 describe-listeners --region $region --load-balancer-arn $albArn --query "Listeners[?Port=='80'].ListenerArn" --output text
+$oldRules = aws elbv2 describe-rules --region $region --listener-arn $l80 --query 'Rules[?IsDefault==`false`].RuleArn' --output text
+foreach ($r in ($oldRules -split "`t")) {
+  if ($r -and $r -ne "None") {
+    aws elbv2 delete-rule --region $region --rule-arn $r --output text 2>$null | Out-Null
+    Write-Host "Regla HTTP eliminada: $r"
+  }
+}
 aws elbv2 modify-listener --region $region --listener-arn $l80 `
-  --default-actions "Type=redirect,RedirectConfig={Protocol=HTTPS,Port=443,StatusCode=HTTP_301}" --output text | Out-Null
+  --default-actions '[{"Type":"redirect","RedirectConfig":{"Protocol":"HTTPS","Port":"443","StatusCode":"HTTP_301"}}]' --output json | Out-Null
 Write-Host "Listener 80: redirect 301 -> HTTPS"
 
 Write-Host "== HTTPS OK. Verifica: https://api.sevensave.com.co/api/health/live y https://admin.sevensave.com.co =="
