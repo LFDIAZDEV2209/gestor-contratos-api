@@ -1,14 +1,16 @@
+# Entorno local reproducible: PostgreSQL 16 + Valkey (compat. Redis).
+# Sin credenciales hardcodeadas: todo por .env (ver .env.example).
 services:
   db:
     image: postgres:16-alpine
-    container_name: gestor-contratos-db
+    container_name: nexogc-db
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USER:-gestor}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-gestor_demo_2026}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Define DB_PASSWORD en .env}
       POSTGRES_DB: ${DB_NAME:-gestor_contratos}
     ports:
-      # 5433 en el host: el 5432 puede estar ocupado por otros proyectos de este equipo.
+      # 5433 en el host: el 5432 puede estar ocupado por otros proyectos.
       - '${DB_PORT:-5433}:5432'
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -17,6 +19,44 @@ services:
       interval: 5s
       timeout: 5s
       retries: 12
+    # Parámetros alineados con RDS productivo (correlated con parameter group nexogc).
+    command:
+      - 'postgres'
+      - '-c'
+      - 'log_min_duration_statement=500'
+      - '-c'
+      - 'shared_buffers=256MB'
+      - '-c'
+      - 'effective_cache_size=768MB'
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    container_name: nexogc-valkey
+    restart: unless-stopped
+    command:
+      - 'valkey-server'
+      - '--requirepass'
+      - '${VALKEY_PASSWORD:?Define VALKEY_PASSWORD en .env}'
+      - '--maxmemory'
+      - '${VALKEY_MAXMEMORY:-256mb}'
+      - '--maxmemory-policy'
+      - 'allkeys-lru'
+      - '--appendonly'
+      - 'yes'
+      - '--appendfilename'
+      - 'nexogc-appendonly.aof'
+    ports:
+      - '${VALKEY_PORT:-6380}:6379' # 6380 en el host: el 6379 puede estar ocupado por Redis de otros proyectos.
+    volumes:
+      - valkeydata:/data
+    healthcheck:
+      test: ['CMD-SHELL', 'valkey-cli -a "$$VALKEY_PASSWORD" ping | grep PONG']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    environment:
+      VALKEY_PASSWORD: ${VALKEY_PASSWORD}
 
 volumes:
   pgdata:
+  valkeydata:
