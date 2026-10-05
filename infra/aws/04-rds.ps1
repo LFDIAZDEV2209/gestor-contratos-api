@@ -35,7 +35,7 @@ $inst = aws rds describe-db-instances --region $region --query "DBInstances[?DBI
 if ($inst -and $inst -ne "None") { Write-Host "RDS ya existe: $inst" }
 else {
   $dbSg = aws ec2 describe-security-groups --region $region --filters Name=group-name,Values=nexogc-sg-db --query "SecurityGroups[0].GroupId" --output text
-  aws rds create-db-instance --region $region --db-instance-identifier nexogc-db-prod --engine postgres --engine-version 16.10 --db-instance-class db.t4g.small --allocated-storage 50 --storage-type gp3 --storage-autoscaling 500 --max-allocated-storage 500 --master-username $dbUser --master-user-password $dbPass --db-name gestor_contratos --vpc-security-group-ids $dbSg --db-subnet-group-name nexogc-db-subnets --db-parameter-group-name nexogc-pg16 --no-publicly-accessible --storage-encrypted --backup-retention-period 7 --backup-window "03:00-03:30" --preferred-maintenance-window "mon:04:00-mon:04:30" --copy-tags-to-snapshot --deletion-protection --auto-minor-version-upgrade --output text | Out-Null
+  aws rds create-db-instance --region $region --db-instance-identifier nexogc-db-prod --engine postgres --engine-version 16.10 --db-instance-class db.t4g.small --allocated-storage 50 --storage-type gp3 --max-allocated-storage 500 --master-username $dbUser --master-user-password $dbPass --db-name gestor_contratos --vpc-security-group-ids $dbSg --db-subnet-group-name nexogc-db-subnets --db-parameter-group-name nexogc-pg16 --no-publicly-accessible --storage-encrypted --backup-retention-period 7 --preferred-backup-window "03:00-03:30" --preferred-maintenance-window "mon:04:00-mon:04:30" --copy-tags-to-snapshot --deletion-protection --auto-minor-version-upgrade --output text | Out-Null
   Write-Host "RDS creando: nexogc-db-prod (tarda ~5 min)"
 }
 

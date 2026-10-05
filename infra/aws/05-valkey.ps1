@@ -23,6 +23,6 @@ $rg = aws elasticache describe-replication-groups --region $region --query "Repl
 if ($rg -and $rg -ne "None") { Write-Host "Valkey ya existe: $rg" }
 else {
   $cacheSg = aws ec2 describe-security-groups --region $region --filters Name=group-name,Values=nexogc-sg-cache --query "SecurityGroups[0].GroupId" --output text
-  aws elasticache create-replication-group --region $region --replication-group-id nexogc-valkey-prod --description "nexogc prod Valkey cache" --engine valkey --engine-version 8.0 --cache-node-type cache.t4g.micro --num-node-groups 1 --replicas-per-node-group 0 --cache-subnet-group-name nexogc-cache-subnets --security-group-ids $cacheSg --transit-encryption-mode required --auth-token $vToken --snapshot-retention-limit 3 --snapshot-window "04:00-05:00" --preferred-maintenance-window "mon:05:00-mon:06:00" --automatic-failover-disabled --output text | Out-Null
+  aws elasticache create-replication-group --region $region --replication-group-id nexogc-valkey-prod --replication-group-description "nexogc prod Valkey cache" --engine valkey --engine-version 8.0 --cache-node-type cache.t4g.micro --num-node-groups 1 --replicas-per-node-group 0 --cache-subnet-group-name nexogc-cache-subnets --security-group-ids $cacheSg --transit-encryption-enabled --auth-token $vToken --snapshot-retention-limit 3 --snapshot-window "04:00-05:00" --preferred-maintenance-window "mon:05:00-mon:06:00" --output text | Out-Null
   Write-Host "Valkey creando: nexogc-valkey-prod"
 }
