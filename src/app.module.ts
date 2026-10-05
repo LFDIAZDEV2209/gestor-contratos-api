@@ -19,6 +19,7 @@ import { GeoModule } from './modules/geo/geo.module';
 import { ContractsCoreModule } from './modules/contracts/contracts.module';
 import { ChildCollectionsModule } from './modules/contracts/child-collections.module';
 import { DashboardsModule } from './modules/dashboards/dashboards.module';
+import { ScheduleModule } from '@nestjs/schedule';
 import { HealthController } from './health.controller';
 import { CacheModule } from './cache/cache.module';
 
@@ -31,6 +32,8 @@ import { CacheModule } from './cache/cache.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, load: [configuration], envFilePath: ['.env'] }),
+    // Scheduler: necesario para alerts.worker.ts (06:00) y refresh de MVs (06:05). Única instancia.
+    ScheduleModule.forRoot(),
     TypeOrmModule.forRootAsync({      inject: [ConfigService],
       useFactory: (cs: ConfigService) => ({
         type: 'postgres' as const,
@@ -44,6 +47,9 @@ import { CacheModule } from './cache/cache.module';
         synchronize: false,
         namingStrategy: new SnakeNamingStrategy(),
         logging: ['error'],
+        // TLS contra RDS en producción (rds.force_ssl): cifra tránsito. TODO(AWS): pin de CA bundle
+        // rds-ca-rsa2048-g1 (global-bundle.pem) para validar identidad del servidor, no solo cifrar.
+        ssl: cs.get<string>('nodeEnv') === 'production' ? { rejectUnauthorized: false } : undefined,
       }),
     }),
     AuditModule,

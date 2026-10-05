@@ -7,6 +7,7 @@ import { Permiso } from '../../common/decorators';
 import { ApiError } from '../../common/exceptions/api-exception';
 import { ReqContext } from '../../common/req-context';
 import { AuditService } from '../audit/audit.service';
+import { ConfigService } from '@nestjs/config';
 
 export interface TokenRespuesta {
   token: string;
@@ -22,9 +23,15 @@ export class AuthService {
     private readonly users: UsersService,
     private readonly roles: RolesService,
     private readonly audit: AuditService,
+    private readonly config: ConfigService,
   ) {}
 
   async login(email: string, ctx: ReqContext): Promise<TokenRespuesta> {
+    // REVISIÓN C01: el login demo no verifica identidad (el email asume el rol).
+    // Prohibido en producción hasta conectar el SSO OIDC (fase 1 del plan files/10).
+    if (this.config.get<string>('nodeEnv') === 'production') {
+      throw new ApiError(503, 'AUTH_SSO_PENDING', 'Autenticación por SSO corporativo pendiente de conexión (fase 1).');
+    }
     const u = await this.users.obtenerPorEmail(email);
     if (!u || u.estado !== 'Activo') {
       throw new ApiError(401, 'UNAUTHENTICATED', 'Credenciales inválidas o usuario inactivo.');
