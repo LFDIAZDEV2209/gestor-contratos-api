@@ -3,6 +3,7 @@ export interface Configuracion {
   port: number;
   pageSize: number;
   nodeEnv: string;
+  authDemoLogin?: string;
   cors: string[];
   alertCron: string;
   uploadDir: string;
@@ -21,6 +22,7 @@ export default (): Configuracion => ({
   port: Number(process.env.PORT ?? 4000),
   pageSize: Number(process.env.DEFAULT_PAGE_SIZE ?? 25),
   nodeEnv: process.env.NODE_ENV ?? 'development',
+  authDemoLogin: process.env.AUTH_DEMO_LOGIN,
   cors: (process.env.CORS_ORIGIN ?? 'http://localhost:3000,http://localhost:3001')
     .split(',')
     .map((s) => s.trim())

@@ -76,6 +76,13 @@ Usuarios sembrados (files/11): `lmendez@empresa.co` (ADMINISTRADOR),
 `rortiz@empresa.co` (INTERVENTOR), `dcastro@empresa.co` (AUDITOR),
 `pllanos@empresa.co` (CONSULTA).
 
+En producción, el login demo se habilita con `AUTH_DEMO_LOGIN=1` en la taskdef
+ECS, según la decisión D0004, para permitir la demostración integrada mientras
+se conecta SSO OIDC. Sin ese valor exacto, producción responde `503 AUTH_SSO_PENDING`.
+La migración `1730800000000-DemoSeedData` siembra los datos demo dentro de la
+transacción de TypeORM únicamente si no hay usuarios. `pnpm seed` reutiliza
+la misma función idempotente; revertir la migración conserva los datos.
+
 ## Convenciones de la API (files/03)
 
 - **Base:** `http://localhost:4000/api`. JSON UTF-8; fechas `AAAA-MM-DD`; dinero entero en COP.

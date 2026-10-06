@@ -1,8 +1,6 @@
 import 'reflect-metadata';
-import { DataSource } from 'typeorm';
-import { SnakeNamingStrategy } from '../snake-naming.strategy';
+import { EntityManager } from 'typeorm';
 import { createHash } from 'node:crypto';
-import { ENTIDADES } from '../entities';
 import '../pg-types';
 import { hoyISO, sumarDias, periodoHace } from '../../common/dates';
 import { CompanyEntity } from '../../modules/companies/companies.entity';
@@ -148,9 +146,9 @@ function partir(valorActual: number, adiciones = 0): { valorBase: number; iva: n
   return { valorBase, iva: valorInicial - valorBase };
 }
 
-export async function sembrarDemo(ds: DataSource): Promise<void> {
+export async function sembrarDatosDemo(manager: EntityManager): Promise<void> {
   // Idempotente: si ya hay datos, no repite el seed.
-  if ((await ds.getRepository(UserEntity).count()) > 0) return;
+  if ((await manager.getRepository(UserEntity).count()) > 0) return;
 
   const hoy = hoyISO();
   const d = (n: number): string => sumarDias(hoy, n);
@@ -166,8 +164,8 @@ export async function sembrarDemo(ds: DataSource): Promise<void> {
     ['U7', 'Diana Castro', 'dcastro@empresa.co', 'AUDITOR'],
     ['U8', 'Pedro Llanos', 'pllanos@empresa.co', 'CONSULTA'],
   ];
-  await ds.getRepository(UserEntity).insert(usuarios.map(([id, nombre, email, rol]) =>
-    ds.getRepository(UserEntity).create({ id, nombre, email, rol, estado: 'Activo', version: 1 }),
+  await manager.getRepository(UserEntity).insert(usuarios.map(([id, nombre, email, rol]) =>
+    manager.getRepository(UserEntity).create({ id, nombre, email, rol, estado: 'Activo', version: 1 }),
   ));
 
   /* ── Matriz de permisos (files/08) ──────────────────────────────────── */
@@ -184,21 +182,21 @@ export async function sembrarDemo(ds: DataSource): Promise<void> {
   const perms: RolePermissionEntity[] = [];
   for (const rol of ROLES) {
     for (const p of PERMISOS) {
-      perms.push(ds.getRepository(RolePermissionEntity).create({
+      perms.push(manager.getRepository(RolePermissionEntity).create({
         rol, permiso: p, habilitado: (porDefecto[rol] ?? []).includes(p),
       }));
     }
   }
-  await ds.getRepository(RolePermissionEntity).insert(perms);
+  await manager.getRepository(RolePermissionEntity).insert(perms);
 
   /* ── Configuración y catálogos ──────────────────────────────────────── */
-  await ds.getRepository(SettingEntity).insert({
+  await manager.getRepository(SettingEntity).insert({
     id: 1, alertDays: [30, 15, 10, 5, 3, 1], criticalDays: 5, budgetPct: 15, gapPct: 20,
   } as SettingEntity);
   for (const [nombre, valores] of Object.entries(CATALOGOS_DEFECTO)) {
-    await ds.getRepository(CatalogEntity).insert({ nombre } as CatalogEntity);
-    await ds.getRepository(CatalogItemEntity).insert(
-      valores.map((valor, i) => ds.getRepository(CatalogItemEntity).create({ catalogNombre: nombre, valor, orden: i })),
+    await manager.getRepository(CatalogEntity).insert({ nombre } as CatalogEntity);
+    await manager.getRepository(CatalogItemEntity).insert(
+      valores.map((valor, i) => manager.getRepository(CatalogItemEntity).create({ catalogNombre: nombre, valor, orden: i })),
     );
   }
 
@@ -210,15 +208,15 @@ export async function sembrarDemo(ds: DataSource): Promise<void> {
     ['EMP-04', 'Logística Portuaria del Atlántico S.A.S.', '901.587.662-9', 'Barranquilla'],
     ['EMP-05', 'Alimentos del Litoral S.A.', '890.104.775-2', 'Soledad'],
   ];
-  await ds.getRepository(CompanyEntity).insert(empresas.map(([id, razon, nit, ciudad]) =>
-    ds.getRepository(CompanyEntity).create({
+  await manager.getRepository(CompanyEntity).insert(empresas.map(([id, razon, nit, ciudad]) =>
+    manager.getRepository(CompanyEntity).create({
       id, razon, nit, tipo: 'Sociedad comercial', ciudad, depto: '08', pais: 'Colombia',
       estado: 'Activa', fechaCreacion: d(-400), version: 1,
     }),
   ));
 
   /* ── Cupos (files/11) ───────────────────────────────────────────────── */
-  await ds.getRepository(CupoEntity).insert([
+  await manager.getRepository(CupoEntity).insert([
     { id: 'CP-01', aseguradora: 'Seguros del Estado S.A.', numero: 'CUPO-SE-2026-118', tomador: 'Unión Temporal Red Salud Norte', intermediario: 'Delima Marsh S.A.', valor: 11_000_000_000, fechaInicio: d(-300), fechaVenc: d(65), estado: 'Vigente', observaciones: 'Cupo corporativo del grupo de salud.', version: 1 },
     { id: 'CP-02', aseguradora: 'Mundial de Seguros S.A.', numero: 'CUPO-MS-0457', tomador: 'Constructora Barlovento S.A.S.', intermediario: 'Interaseguros S.A.', valor: 2_400_000_000, fechaInicio: d(-200), fechaVenc: d(160), estado: 'Vigente', version: 1 },
     { id: 'CP-03', aseguradora: 'Seguros Generales Suramericana (SURA)', numero: 'CUPO-SURA-77120', tomador: 'Grupo empresarial (cupo corporativo)', intermediario: 'SURA Brokers', valor: 3_500_000_000, fechaInicio: d(-280), fechaVenc: d(85), estado: 'Vigente', version: 1 },
@@ -227,7 +225,7 @@ export async function sembrarDemo(ds: DataSource): Promise<void> {
   ]);
 
   /* ── Contratos ──────────────────────────────────────────────────────── */
-  const contratosRepo = ds.getRepository(ContractEntity);
+  const contratosRepo = manager.getRepository(ContractEntity);
   for (const cfg of CONFIG) {
     const { valorBase, iva } = partir(cfg.valorActual, cfg.adiciones ?? 0);
     await contratosRepo.insert(contratosRepo.create({
@@ -263,8 +261,8 @@ export async function sembrarDemo(ds: DataSource): Promise<void> {
   }
 
   /* ── Ejecución mensual y pagos ──────────────────────────────────────── */
-  const execsRepo = ds.getRepository(ExecEntity);
-  const pagosRepo = ds.getRepository(PaymentEntity);
+  const execsRepo = manager.getRepository(ExecEntity);
+  const pagosRepo = manager.getRepository(PaymentEntity);
   for (const cfg of CONFIG) {
     const vals = repartir(cfg.ejecutado, cfg.nExecs);
     const meses = periodoDesde(d(cfg.inicio), cfg.nExecs);
@@ -298,7 +296,7 @@ export async function sembrarDemo(ds: DataSource): Promise<void> {
   }
 
   /* ── Garantías (23) ─────────────────────────────────────────────────── */
-  await ds.getRepository(GuaranteeEntity).insert([
+  await manager.getRepository(GuaranteeEntity).insert([
     // CT-01 · Seguros del Estado (por cupo CP-01) + SURA (CP-03) + Bolívar (individual)
     { id: 'GR-01', contractId: 'CT-01', tipo: 'Cumplimiento', aseguradora: 'Seguros del Estado S.A.', poliza: 'PL-431371', modalidadPoliza: 'Póliza por cupo', cupoId: 'CP-01', porcentaje: 10, tomador: 'Unión Temporal Red Salud Norte', intermediario: 'Delima Marsh S.A.', prima: 16_874_405, valor: 4_218_601_203, fechaExp: d(-296), fechaInicio: d(-294), fechaVenc: d(420), estado: 'Aprobada', version: 1 },
     { id: 'GR-02', contractId: 'CT-01', tipo: 'Manejo de anticipo', aseguradora: 'Seguros del Estado S.A.', poliza: 'PL-431372', modalidadPoliza: 'Póliza por cupo', cupoId: 'CP-01', porcentaje: 10, tomador: 'Unión Temporal Red Salud Norte', intermediario: 'Delima Marsh S.A.', prima: 14_400_000, valor: 4_218_601_203, fechaExp: d(-296), fechaInicio: d(-294), fechaVenc: d(420), estado: 'Aprobada', version: 1 },
@@ -334,7 +332,7 @@ export async function sembrarDemo(ds: DataSource): Promise<void> {
   ]);
 
   /* ── Subcontratos (6) ───────────────────────────────────────────────── */
-  await ds.getRepository(SubcontractEntity).insert([
+  await manager.getRepository(SubcontractEntity).insert([
     { id: 'SC-01', contractId: 'CT-01', numero: 'ST-01-2026', contratista: 'Clínica Norte IPS S.A.S.', nit: '901.100.201-5', objeto: 'Atención de urgencias y hospitalización en Barranquilla.', valor: 8_000_000_000, fechaInicio: d(-290), fechaFin: d(5), estado: 'Activo', ejecucion: 85, responsable: 'Martha Salcedo', version: 1 },
     { id: 'SC-02', contractId: 'CT-01', numero: 'ST-02-2026', contratista: 'Centro Médico del Caribe Ltda.', nit: '900.220.330-8', objeto: 'Consulta externa y laboratorio en Valledupar.', valor: 5_500_000_000, fechaInicio: d(-280), fechaFin: d(5), estado: 'Activo', ejecucion: 80, responsable: 'Martha Salcedo', version: 1 },
     { id: 'SC-03', contractId: 'CT-02', numero: 'ST-01-2026B', contratista: 'Drenajes del Caribe S.A.S.', nit: '901.331.442-0', objeto: 'Ejecución de drenajes pluviales de la vía lateral.', valor: 900_000_000, fechaInicio: d(-180), fechaFin: d(100), estado: 'Activo', ejecucion: 55, responsable: 'Juan Pérez', version: 1 },
@@ -344,7 +342,7 @@ export async function sembrarDemo(ds: DataSource): Promise<void> {
   ]);
 
   /* ── Obligaciones (19) ──────────────────────────────────────────────── */
-  await ds.getRepository(ObligationEntity).insert([
+  await manager.getRepository(ObligationEntity).insert([
     { id: 'OB-01', contractId: 'CT-01', tipo: 'Reporte / informe', descripcion: 'Informe mensual de indicadores de la red', responsable: 'Néstor Villalba', fechaLimite: d(-9), periodicidad: 'Mensual', estado: 'Pendiente', cumplimiento: 0, obs: 'Demo: vencida hace 9 días.', version: 1 },
     { id: 'OB-02', contractId: 'CT-01', tipo: 'Seguridad social', descripcion: 'Aportes de seguridad social del personal', responsable: 'Néstor Villalba', fechaLimite: d(-3), periodicidad: 'Mensual', estado: 'En proceso', cumplimiento: 30, version: 1 },
     { id: 'OB-03', contractId: 'CT-01', tipo: 'Técnica', descripcion: 'Dotación de las sedes de atención primaria', responsable: 'Néstor Villalba', fechaLimite: d(-60), periodicidad: 'Única', estado: 'Cumplida', cumplimiento: 100, version: 1 },
@@ -367,7 +365,7 @@ export async function sembrarDemo(ds: DataSource): Promise<void> {
   ]);
 
   /* ── Entregables (13) ───────────────────────────────────────────────── */
-  await ds.getRepository(DeliverableEntity).insert([
+  await manager.getRepository(DeliverableEntity).insert([
     { id: 'EN-01', contractId: 'CT-02', nombre: 'Diseño de drenajes', descripcion: 'Plano y memoria de cálculo del tramo 1.', fechaInicio: d(-180), fechaProg: d(-120), fechaReal: d(-118), responsable: 'Camilo Duarte', estado: 'Aprobado', avance: 100, version: 1 },
     { id: 'EN-02', contractId: 'CT-02', nombre: 'Prueba de drenajes', fechaInicio: d(-90), fechaProg: d(80), responsable: 'Camilo Duarte', estado: 'Pendiente', avance: 20, version: 1 },
     { id: 'EN-03', contractId: 'CT-03', nombre: 'Informe de suministro del mes', fechaInicio: d(-40), fechaProg: d(-15), fechaReal: d(-16), responsable: 'Elda Peralta', estado: 'Entregado', avance: 100, version: 1 },
@@ -384,7 +382,7 @@ export async function sembrarDemo(ds: DataSource): Promise<void> {
   ]);
 
   /* ── Actas (18) ─────────────────────────────────────────────────────── */
-  const actasRepo = ds.getRepository(ActaEntity);
+  const actasRepo = manager.getRepository(ActaEntity);
   const actas: [string, string, string, number, string, string, string][] = [
     ['AC-01', 'CT-01', 'Acta de inicio', -294, 'Inicio de la operación de la red de salud.', 'Firmada', 'Néstor Villalba'],
     ['AC-02', 'CT-01', 'Acta parcial', -150, 'Entrega parcial del primer trimestre de la red.', 'Firmada', 'Néstor Villalba'],
@@ -413,7 +411,7 @@ export async function sembrarDemo(ds: DataSource): Promise<void> {
   }
 
   /* ── Modificaciones (4) ─────────────────────────────────────────────── */
-  await ds.getRepository(ModificationEntity).insert([
+  await manager.getRepository(ModificationEntity).insert([
     { id: 'MD-01', contractId: 'CT-02', numero: 'MD-01', tipo: 'Adición', fecha: d(-120), justificacion: 'Adición de obra para obras complementarias de señalización.', valorAnterior: 3_800_000_000, valorNuevo: 3_811_500_000, impacto: 'Aumenta el valor del contrato en 11,5 millones. Revise las pólizas.', estado: 'Activa', version: 1 },
     { id: 'MD-02', contractId: 'CT-04', numero: 'MD-02', tipo: 'Suspensión', fecha: d(-30), justificacion: 'Suspensión de actividades por reorganización del área.', impacto: 'El contrato queda suspendido.', estado: 'Activa', version: 1 },
     { id: 'MD-03', contractId: 'CT-05', numero: 'MD-03', tipo: 'Prórroga', fecha: d(-45), justificacion: 'Prórroga para cerrar el plan de expansión.', fechaAnterior: d(-22), fechaNueva: d(8), impacto: 'Se amplía la terminación. Revise las pólizas.', estado: 'Activa', version: 1 },
@@ -421,7 +419,7 @@ export async function sembrarDemo(ds: DataSource): Promise<void> {
   ]);
 
   /* ── Riesgos (10) ───────────────────────────────────────────────────── */
-  await ds.getRepository(RiskEntity).insert([
+  await manager.getRepository(RiskEntity).insert([
     { id: 'RG-01', contractId: 'CT-01', categoria: 'Operativo', riesgo: 'Capacidad hospitalaria insuficiente en temporada alta', prob: 4, impacto: 4, responsable: 'Martha Salcedo', tratamiento: 'Mitigar', fecha: d(-280), estado: 'Abierto', mitigacion: null, version: 1 },
     { id: 'RG-02', contractId: 'CT-01', categoria: 'Financiero', riesgo: 'Giro de recursos por debajo del gasto real', prob: 3, impacto: 3, responsable: 'Andrés Gómez', tratamiento: 'Mitigar', fecha: d(-270), estado: 'Controlado', mitigacion: 'Tabla de giros semanal con corte de ejecución.', version: 1 },
     { id: 'RG-03', contractId: 'CT-02', categoria: 'Legal / regulatorio', riesgo: 'Cambio de normativa vial durante la obra', prob: 2, impacto: 4, responsable: 'Juan Pérez', tratamiento: 'Transferir', fecha: d(-180), estado: 'Controlado', mitigacion: 'Póliza de estabilidad en trámite.', version: 1 },
@@ -435,7 +433,7 @@ export async function sembrarDemo(ds: DataSource): Promise<void> {
   ]);
 
   /* ── Incumplimientos (4) ────────────────────────────────────────────── */
-  await ds.getRepository(BreachEntity).insert([
+  await manager.getRepository(BreachEntity).insert([
     { id: 'IN-01', contractId: 'CT-01', fecha: d(-7), obligationId: 'OB-01', tipo: 'Reporte sin presentar', descripcion: 'No se presentó el informe mensual de indicadores correspondiente.', responsable: 'Martha Salcedo', impacto: 'Alto', estado: 'Abierto', plan: 'Requerimiento formal y plan de mejoramiento.', fechaLimite: d(7), multa: 0, version: 1 },
     { id: 'IN-02', contractId: 'CT-03', fecha: d(-18), obligationId: 'OB-07', tipo: 'Falla de suministro', descripcion: 'Incompletitud de la entrega de insumos del periodo.', responsable: 'Elda Peralta', impacto: 'Medio', estado: 'En gestión', plan: 'Suministro complementario en 15 días.', fechaLimite: d(-3), version: 1 },
     { id: 'IN-03', contractId: 'CT-04', fecha: d(-35), tipo: 'Retraso de entregables', descripcion: 'Entrega tardía del informe de avance de la consultoría.', responsable: 'Juan Pérez', impacto: 'Bajo', estado: 'Subsanado', medida: 'Entrega subsanada con recargo.', multa: 0, version: 1 },
@@ -443,15 +441,15 @@ export async function sembrarDemo(ds: DataSource): Promise<void> {
   ]);
 
   /* ── Planes de mejoramiento (3) ─────────────────────────────────────── */
-  await ds.getRepository(PlanEntity).insert([
+  await manager.getRepository(PlanEntity).insert([
     { id: 'PM-01', contractId: 'CT-01', fecha: d(-5), hallazgo: 'Informe mensual no presentado (OB-01).', causa: 'Falla de coordinación del área de reportes.', accion: 'Requerimiento formal y cronograma de reportes.', responsable: 'Martha Salcedo', estado: 'En ejecución', avance: 45, version: 1 },
     { id: 'PM-02', contractId: 'CT-03', fecha: d(-15), hallazgo: 'Entrega incompleta de insumos (OB-07).', causa: 'Demoras del proveedor de insumos.', accion: 'Suministro complementario en 15 días.', responsable: 'Andrés Gómez', estado: 'Abierto', avance: 20, version: 1 },
     { id: 'PM-03', contractId: 'CT-09', fecha: d(-20), hallazgo: 'Ejecución financiera por encima del valor contratado.', causa: 'Falta de adición formal por nuevas rutas.', accion: 'Registrar adición y revisar pólizas.', responsable: 'Andrés Gómez', estado: 'En ejecución', avance: 60, version: 1 },
   ]);
 
   /* ── Documentos (42) ────────────────────────────────────────────────── */
-  const docsRepo = ds.getRepository(DocumentEntity);
-  const versRepo = ds.getRepository(DocumentVersionEntity);
+  const docsRepo = manager.getRepository(DocumentEntity);
+  const versRepo = manager.getRepository(DocumentVersionEntity);
   const docs: [string, string, string, number, string | null, boolean][] = [
     // [id, contractId, categoria, offset, obs, conExtracted]
     ['DOC-01', 'CT-01', 'Contrato', -296, null, true],
@@ -530,7 +528,7 @@ export async function sembrarDemo(ds: DataSource): Promise<void> {
   }));
 
   /* ── Auditoría demo (18) ────────────────────────────────────────────── */
-  const auditRepo = ds.getRepository(AuditLogEntity);
+  const auditRepo = manager.getRepository(AuditLogEntity);
   const demoAudit: [number, string, string, string, string, string | null, string | null, string | null, string | null, string][] = [
     // [offsetDías, usuario, rol, modulo, accion, campo, anterior, nuevo, obs, ip]
     [-200, 'Laura Méndez', 'ADMINISTRADOR', 'Empresas', 'CREAR', null, null, 'Salud Integral del Caribe IPS S.A.S.', null, '192.168.1.10'],
@@ -567,7 +565,7 @@ export async function sembrarDemo(ds: DataSource): Promise<void> {
 
   /* ── Verificación de volumen (files/11) ─────────────────────────────── */
   const conteo = async (tabla: string): Promise<number> => Number(
-    (await ds.query(`SELECT COUNT(*)::int AS c FROM ${tabla}`))[0]?.c ?? 0,
+    (await manager.query(`SELECT COUNT(*)::int AS c FROM ${tabla}`))[0]?.c ?? 0,
   );
   const resumen = {
     companies: await conteo('companies'),
@@ -603,6 +601,8 @@ function valorInicialDe(cfg: ConfigContrato): number {
 function periodoDesde(fechaISO: string, n: number): string[] {
   const out: string[] = [];
   const base = new Date(`${fechaISO}T00:00:00Z`);
+  // Evita saltar febrero y repetir marzo cuando la fecha inicial cae en día 29, 30 o 31.
+  base.setUTCDate(1);
   for (let i = 0; i < n; i++) {
     const dt = new Date(base);
     dt.setUTCMonth(dt.getUTCMonth() + i);

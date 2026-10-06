@@ -1,6 +1,5 @@
 import 'dotenv/config';
-import { DataSource } from 'typeorm';
-import { sembrarDemo } from './demo-seed';
+import { sembrarDatosDemo } from './demo-seed';
 import { dsSeed } from './seed-datasource';
 
 /** Ejecutable del seed: `pnpm seed`. */
@@ -8,7 +7,7 @@ async function main(): Promise<void> {
   const ds = dsSeed();
   try {
     await ds.initialize();
-    await sembrarDemo(ds);
+    await ds.transaction((manager) => sembrarDatosDemo(manager));
   } finally {
     await ds.destroy();
   }

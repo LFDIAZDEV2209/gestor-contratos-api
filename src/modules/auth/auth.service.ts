@@ -28,8 +28,9 @@ export class AuthService {
 
   async login(email: string, ctx: ReqContext): Promise<TokenRespuesta> {
     // REVISIÓN C01: el login demo no verifica identidad (el email asume el rol).
-    // Prohibido en producción hasta conectar el SSO OIDC (fase 1 del plan files/10).
-    if (this.config.get<string>('nodeEnv') === 'production') {
+    // D0004: en producción solo se habilita con autorización explícita por entorno.
+    const demoAuth = this.config.get<string>('authDemoLogin') === '1';
+    if (this.config.get<string>('nodeEnv') === 'production' && !demoAuth) {
       throw new ApiError(503, 'AUTH_SSO_PENDING', 'Autenticación por SSO corporativo pendiente de conexión (fase 1).');
     }
     const u = await this.users.obtenerPorEmail(email);
