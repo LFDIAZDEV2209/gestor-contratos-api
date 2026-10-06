@@ -16,8 +16,8 @@ phases:
       - export TD_ARN=$(jq -r '.taskDefinitionArn' "$CODEBUILD_SRC_DIR_BuildOut/build-out.json")
       - echo "Migraciones con taskdef $TD_ARN"
       - export TASK_ARN=$(aws ecs run-task --region "$AWS_DEFAULT_REGION" --cluster "$CLUSTER" --task-definition "$TD_ARN" --launch-type FARGATE --started-by codepipeline-migrate --network-configuration "awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$SG_APP],assignPublicIp=DISABLED}" --overrides '{"containerOverrides":[{"name":"api","command":["node","node_modules/typeorm/cli.js","migration:run","-d","dist/database/data-source.js"]}]}' --query "tasks[0].taskArn" --output text)
-      - echo "Task one-off: $TASK_ARN"
+      - echo "Task one-off $TASK_ARN"
       - aws ecs wait tasks-stopped --cluster "$CLUSTER" --tasks "$TASK_ARN"
       - export EXIT=$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$TASK_ARN" --query "tasks[0].containers[0].exitCode" --output text)
-      - echo "Exit code de la migracion: $EXIT"
+      - echo "Exit code de la migracion $EXIT"
       - test "$EXIT" = "0"
