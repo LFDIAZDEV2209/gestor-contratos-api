@@ -3,17 +3,29 @@ import {
 } from 'typeorm';
 import { DatosExtraidos } from '../../../engines/reconcile.engine';
 
-/** Documentos por contrato (files/02 · prefijo DOC). Anular conserva todas sus versiones. */
+/** Documentos por contrato (files/02 · prefijo DOC). Anular conserva todas sus versiones.
+ *  Adjuntos polimórficos: contractId para documentos de contrato; refId/refTipo para
+ *  soportes de entidades sin contrato (p. ej. cupos de aseguradora). */
 @Entity('documents')
 @Index('ix_documents_contract', ['contractId'])
 @Index('ix_documents_categoria', ['categoria'])
 @Index('ix_documents_estado', ['estado'])
+@Index('ix_documents_ref', ['refId'])
 export class DocumentEntity {
   @PrimaryColumn('text')
   id!: string;
 
-  @Column({ type: 'text' })
-  contractId!: string;
+  /** Contrato al que pertenece el documento (null para adjuntos polimórficos). */
+  @Column({ type: 'text', nullable: true })
+  contractId?: string | null;
+
+  /** Entidad propietaria del adjunto cuando no hay contrato (p. ej. 'cupo' + CP-01). */
+  @Column({ type: 'text', nullable: true })
+  refId?: string | null;
+
+  /** Tipo de la entidad propietaria (cupo | garantia | tarea | ...). */
+  @Column({ type: 'text', nullable: true })
+  refTipo?: string | null;
 
   @Column({ type: 'text' })
   nombre!: string;

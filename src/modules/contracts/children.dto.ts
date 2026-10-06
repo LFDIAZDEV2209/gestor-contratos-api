@@ -344,14 +344,22 @@ export class CrearPlanDto extends PlanCampos {
 /* ── Documentos ───────────────────────────────────────────────────────────── */
 
 export class CrearDocumentoDto {
-  @IsString() @MinLength(1)
-  contractId!: string;
+  /** Contrato del documento. Obligatorio salvo adjunto polimórfico (refId/refTipo). */
+  @IsOptional() @IsString() @MinLength(1)
+  contractId?: string;
 
   @IsString() @MinLength(1) @MaxLength(200)
   nombre!: string;
 
   @IsString() @MinLength(1)
   categoria!: string;
+
+  /** Adjunto polimórfico: entidad propietaria cuando no hay contrato (p. ej. cupo CP-01). */
+  @IsOptional() @IsString() @MinLength(1)
+  refId?: string;
+
+  @IsOptional() @IsString() @MinLength(1)
+  refTipo?: string;
 
   @IsOptional() @IsString() @MaxLength(2000)
   obs?: string;

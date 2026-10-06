@@ -41,17 +41,45 @@ export class DocumentsService {
     }));
   }
 
+  /** Adjuntos polimórficos por entidad propietaria (p. ej. cupos: refTipo='cupo'). */
+  async listarPorRef(refId: string, refTipo?: string) {
+    const [docs, vers] = await Promise.all([
+      this.docs.find({
+        where: refTipo ? { refId, refTipo } : { refId },
+        order: { createdAt: 'DESC' },
+      }),
+      this.versiones.find({ order: { v: 'DESC' } }),
+    ]);
+    const ids = new Set(docs.map((d) => d.id));
+    return docs.map((d) => ({
+      ...d,
+      versions: vers.filter((v) => v.documentId === d.id && ids.has(d.id)).sort((a, b) => b.v - a.v),
+    }));
+  }
+
   async crear(
-    dto: { contractId: string; nombre: string; categoria: string; obs?: string; extracted?: Record<string, unknown> },
+    dto: {
+      contractId?: string; nombre: string; categoria: string;
+      refId?: string; refTipo?: string; obs?: string; extracted?: Record<string, unknown>;
+    },
     archivo: { originalname: string; buffer: Buffer; mimetype?: string } | undefined,
     ctx: ReqContext,
   ): Promise<DocumentEntity> {
     if (!archivo) throw new Validacion('El archivo del documento es requerido.', ['archivo']);
+    const contractId = dto.contractId?.trim() || null;
+    const refId = dto.refId?.trim() || null;
+    const refTipo = dto.refTipo?.trim() || null;
+    if (!contractId && !(refId && refTipo)) {
+      throw new Validacion('Se requiere contractId, o refId+refTipo para adjuntos polimórficos.', ['contractId', 'refId']);
+    }
     const docId = newId('DOC');
-    const ruta = await this.subirBlob(dto.contractId, docId, 1, archivo.originalname, archivo.buffer, archivo.mimetype);
+    const carpeta = contractId ?? `${refTipo}-${refId}`;
+    const ruta = await this.subirBlob(carpeta, docId, 1, archivo.originalname, archivo.buffer, archivo.mimetype);
     const doc = await this.docs.save(this.docs.create({
       id: docId,
-      contractId: dto.contractId,
+      contractId,
+      refId,
+      refTipo,
       nombre: dto.nombre,
       categoria: dto.categoria,
       estado: 'Activo',
@@ -79,7 +107,8 @@ export class DocumentsService {
     if (!archivo) throw new Validacion('El archivo de la nueva versión es requerido.', ['archivo']);
     const max = await this.versiones.findOne({ where: { documentId: id }, order: { v: 'DESC' } });
     const v = (max?.v ?? 0) + 1;
-    const ruta = await this.subirBlob(doc.contractId, id, v, archivo.originalname, archivo.buffer, archivo.mimetype);
+    const carpeta = doc.contractId ?? `${doc.refTipo}-${doc.refId}`;
+    const ruta = await this.subirBlob(carpeta, id, v, archivo.originalname, archivo.buffer, archivo.mimetype);
     const version = await this.versiones.save(this.versiones.create({
       id: newId('DV'), documentId: id, v, fecha: hoyISO(), usuario: ctx.usuario, archivo: ruta,
       motivo: dto.motivo, cambios: dto.cambios ?? null,

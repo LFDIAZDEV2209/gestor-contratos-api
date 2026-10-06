@@ -25,6 +25,13 @@ export class DocumentsController {
     return this.docs.listarPorContrato(contractId);
   }
 
+  /** GET /documents/by-ref/:refId — adjuntos polimórficos (cupos y otras entidades). */
+  @Get('by-ref/:refId')
+  @Perm('VER')
+  listarPorRef(@Param('refId') refId: string, @Query('refTipo') refTipo: string | undefined) {
+    return this.docs.listarPorRef(refId, refTipo || undefined);
+  }
+
   @Post()
   @Perm('CREAR')
   @UseInterceptors(FileInterceptor('archivo'))
