@@ -13,8 +13,8 @@ env:
 phases:
   build:
     commands:
-      - export TD_ARN=$(jq -r '.taskDefinitionArn' "$CODEBUILD_SRC_DIR_BuildOut/build-out.json")
-      - echo "Migraciones con taskdef $TD_ARN"
+      - TD_ARN=$(jq -r '.taskDefinitionArn' build-out.json) && echo "Migrando con taskdef $TD_ARN" || exit 1
+      - export TD_ARN
       - TASK_ARN=$(aws ecs run-task --region "$AWS_DEFAULT_REGION" --cluster "$CLUSTER" --task-definition "$TD_ARN" --launch-type FARGATE --started-by codepipeline-migrate --network-configuration "awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$SG_APP],assignPublicIp=DISABLED}" --overrides '{"containerOverrides":[{"name":"api","command":["node","node_modules/typeorm/cli.js","migration:run","-d","dist/database/data-source.js"]}]}' --query "tasks[0].taskArn" --output text) || exit 1
       - export TASK_ARN
       - echo "Task one-off $TASK_ARN"
