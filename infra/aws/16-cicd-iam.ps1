@@ -1,7 +1,9 @@
 # nexogc - 16 CI/CD IAM: bucket de artifacts + roles CodePipeline/CodeBuild + policy SNS para EventBridge.
 # Idempotente: crea solo lo que falta; policies inline se reescriben en cada ejecucion.
 # Ejecutar ANTES de 17-cicd-pipelines.ps1. Requiere AWS CLI con perfil admin (region us-east-1).
-$ErrorActionPreference = "Stop"
+# EAP=Continue: en PS 5.1 el stderr de aws (head-bucket/get-role cuando no existe) abortaria con Stop.
+# Cada paso critico se valida con Guard usando $LASTEXITCODE.
+$ErrorActionPreference = "Continue"
 $region = "us-east-1"
 $account = "933629770820"
 $bucket = "nexogc-artifacts-$account"
@@ -14,6 +16,9 @@ New-Item -ItemType Directory -Force -Path $tmp | Out-Null
 function Write-JsonFile($path, $obj) {
   [System.IO.File]::WriteAllText($path, ($obj | ConvertTo-Json -Depth 12))
 }
+function Guard($step) {
+  if ($LASTEXITCODE -ne 0) { throw "Fallo en: $step (exit $LASTEXITCODE)" }
+}
 
 # --- 1) Bucket de artifacts de CodePipeline ---
 aws s3api head-bucket --bucket $bucket --region $region 2>$null
@@ -24,8 +29,10 @@ if ($LASTEXITCODE -ne 0) {
   Write-Host "Bucket ya existe: $bucket"
 }
 aws s3api put-public-access-block --bucket $bucket --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true" --no-cli-pager | Out-Null
+Guard "put-public-access-block"
 Write-JsonFile "$tmp\enc.json" @{ Rules = @(@{ ApplyServerSideEncryptionByDefault = @{ SSEAlgorithm = "AES256" } }) }
 aws s3api put-bucket-encryption --bucket $bucket --server-side-encryption-configuration "file://$tmp\enc.json" --no-cli-pager | Out-Null
+Guard "put-bucket-encryption"
 Write-JsonFile "$tmp\bucket-policy.json" @{
   Version = "2012-10-17"
   Statement = @(
@@ -34,12 +41,14 @@ Write-JsonFile "$tmp\bucket-policy.json" @{
        Condition = @{ Bool = @{ "aws:SecureTransport" = "false" } } }
   )
 }
-aws s3api put-bucket-policy --bucket $bucket --policy-document "file://$tmp\bucket-policy.json" --no-cli-pager | Out-Null
+aws s3api put-bucket-policy --bucket $bucket --policy "file://$tmp\bucket-policy.json" --no-cli-pager | Out-Null
+Guard "put-bucket-policy"
 Write-JsonFile "$tmp\lifecycle.json" @{
   Rules = @(@{ ID = "abort-partials"; Prefix = "partial-artifacts/"; Status = "Enabled"
                AbortIncompleteMultipartUpload = @{ DaysAfterInitiation = 7 } })
 }
 aws s3api put-bucket-lifecycle-configuration --bucket $bucket --lifecycle-configuration "file://$tmp\lifecycle.json" --no-cli-pager | Out-Null
+Guard "put-bucket-lifecycle-configuration"
 Write-Host "Bucket configurado: SSE-AES256 + Block Public Access + deny HTTP + abort multipart 7d"
 
 # --- 2) Roles IAM ---
@@ -50,6 +59,7 @@ function Ensure-Role($name, $trustFile) {
   $arn = aws iam get-role --role-name $name --query "Role.Arn" --output text 2>$null
   if ($LASTEXITCODE -ne 0) {
     $arn = aws iam create-role --role-name $name --assume-role-policy-document "file://$trustFile" --query "Role.Arn" --output text
+    Guard "create-role $name"
     Write-Host "Rol creado: $name ($arn)"
   } else {
     Write-Host "Rol ya existe: $name"
@@ -79,6 +89,7 @@ Write-JsonFile "$tmp\pol-pipeline.json" @{
   )
 }
 aws iam put-role-policy --role-name nexogc-cicd-pipeline-role --policy-name nexogc-cicd-pipeline --policy-document "file://$tmp\pol-pipeline.json" | Out-Null
+Guard "put-role-policy pipeline"
 
 # Rol de build: logs + artifacts + push ECR + registrar taskdef de los servicios nexogc.
 Write-JsonFile "$tmp\pol-build.json" @{
@@ -99,6 +110,7 @@ Write-JsonFile "$tmp\pol-build.json" @{
   )
 }
 aws iam put-role-policy --role-name nexogc-cicd-build-role --policy-name nexogc-cicd-build --policy-document "file://$tmp\pol-build.json" | Out-Null
+Guard "put-role-policy build"
 
 # Rol de migrate: lanzar task one-off con la taskdef nueva + esperar + leer artifacts.
 Write-JsonFile "$tmp\pol-migrate.json" @{
@@ -116,6 +128,7 @@ Write-JsonFile "$tmp\pol-migrate.json" @{
   )
 }
 aws iam put-role-policy --role-name nexogc-cicd-migrate-role --policy-name nexogc-cicd-migrate --policy-document "file://$tmp\pol-migrate.json" | Out-Null
+Guard "put-role-policy migrate"
 
 # Rol de deploy: actualizar los dos servicios ECS (scoped) + esperar estabilidad.
 Write-JsonFile "$tmp\pol-deploy.json" @{
@@ -131,6 +144,7 @@ Write-JsonFile "$tmp\pol-deploy.json" @{
   )
 }
 aws iam put-role-policy --role-name nexogc-cicd-deploy-role --policy-name nexogc-cicd-deploy --policy-document "file://$tmp\pol-deploy.json" | Out-Null
+Guard "put-role-policy deploy"
 
 # --- 4) Policy del topic SNS: permitir que EventBridge publique (fallos de pipeline / rollback ECS) ---
 Write-JsonFile "$tmp\sns-policy.json" @{
@@ -146,5 +160,6 @@ Write-JsonFile "$tmp\sns-policy.json" @{
   )
 }
 aws sns set-topic-attributes --region $region --topic-arn $snsArn --attribute-name Policy --attribute-value "file://$tmp\sns-policy.json" | Out-Null
+Guard "set-topic-attributes SNS"
 
 Write-Host "== 16-cicd-iam OK (bucket + 4 roles + policy SNS) =="
