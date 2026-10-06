@@ -1,8 +1,13 @@
+# nexogc - contexto de build del API (imagen Docker multi-stage)
 node_modules
 dist
+.git
+.env
+.env.*
 coverage
 data
-.env
-.git
+docs
+infra
+test
 *.log
 README.md
