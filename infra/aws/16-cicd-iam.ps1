@@ -106,7 +106,7 @@ Write-JsonFile "$tmp\pol-build.json" @{
        Resource = "arn:aws:ecr:${region}:${account}:repository/nexogc/*" },
     @{ Sid = "Taskdefs"; Effect = "Allow"
        Action = @("ecs:RegisterTaskDefinition")
-       Resource = @("arn:aws:ecs:${region}:${account}:task-definition/nexogc-api", "arn:aws:ecs:${region}:${account}:task-definition/nexogc-front") },
+       Resource = @("arn:aws:ecs:${region}:${account}:task-definition/nexogc-api", "arn:aws:ecs:${region}:${account}:task-definition/nexogc-api:*", "arn:aws:ecs:${region}:${account}:task-definition/nexogc-front", "arn:aws:ecs:${region}:${account}:task-definition/nexogc-front:*") },
     @{ Sid = "TaskdefRead"; Effect = "Allow"
        Action = @("ecs:DescribeTaskDefinition")
        Resource = "*" },
