@@ -17,7 +17,7 @@ env:
 phases:
   install:
     commands:
-      - npm install -g pnpm@9
+      - npm install -g pnpm@12
       - pnpm --version
   pre_build:
     commands:

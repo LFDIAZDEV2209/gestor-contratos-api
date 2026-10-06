@@ -88,7 +88,7 @@ $sourceAction = {
   @{
     name = "GitHub"; runOrder = 1
     actionTypeId = @{ category = "Source"; owner = "AWS"; version = "1"; provider = "CodeStarSourceConnection" }
-    configuration = @{ ConnectionArn = $conn; FullRepositoryId = $repoId; BranchName = "main"; OutputArtifactFormat = "CODEBUILD_DEFAULT" }
+    configuration = @{ ConnectionArn = $conn; FullRepositoryId = $repoId; BranchName = "main" }
     outputArtifacts = @(@{ name = $outName })
   }
 }

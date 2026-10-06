@@ -104,8 +104,12 @@ Write-JsonFile "$tmp\pol-build.json" @{
     @{ Sid = "EcrRepo"; Effect = "Allow"
        Action = @("ecr:BatchCheckLayerAvailability","ecr:CompleteLayerUpload","ecr:InitiateLayerUpload","ecr:PutImage","ecr:UploadLayerPart","ecr:BatchGetImage","ecr:GetDownloadUrlForLayer","ecr:DescribeImages")
        Resource = "arn:aws:ecr:${region}:${account}:repository/nexogc/*" },
-    @{ Sid = "Taskdefs"; Effect = "Allow"; Action = @("ecs:DescribeTaskDefinition","ecs:RegisterTaskDefinition")
+    @{ Sid = "Taskdefs"; Effect = "Allow"
+       Action = @("ecs:RegisterTaskDefinition")
        Resource = @("arn:aws:ecs:${region}:${account}:task-definition/nexogc-api", "arn:aws:ecs:${region}:${account}:task-definition/nexogc-front") },
+    @{ Sid = "TaskdefRead"; Effect = "Allow"
+       Action = @("ecs:DescribeTaskDefinition")
+       Resource = "*" },
     @{ Sid = "PassRoles"; Effect = "Allow"; Action = "iam:PassRole"; Resource = @($execRoleArn, $taskRoleArn) }
   )
 }
