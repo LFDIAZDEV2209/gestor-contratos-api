@@ -7,6 +7,9 @@ export interface Configuracion {
   cors: string[];
   alertCron: string;
   uploadDir: string;
+  /** Bucket S3 para documentos (fase 2). Vacío ⇒ almacenamiento en disco local. */
+  s3Bucket: string;
+  awsRegion: string;
   db: { host: string; port: number; user: string; password: string; name: string };
   cache: {
     host?: string;
@@ -29,6 +32,8 @@ export default (): Configuracion => ({
     .filter(Boolean),
   alertCron: process.env.ALERT_CRON ?? '0 6 * * *',
   uploadDir: process.env.UPLOAD_DIR ?? './data/uploads',
+  s3Bucket: process.env.S3_BUCKET ?? '',
+  awsRegion: process.env.AWS_REGION ?? 'us-east-1',
   cache: {
     host: process.env.VALKEY_HOST || undefined,
     port: Number(process.env.VALKEY_PORT ?? 6379),

@@ -7,6 +7,7 @@ import { Response } from 'express';
 import { createReadStream, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { DocumentsService } from './documents.service';
+import { BlobStorageService } from '../../common/blob-storage';
 import { CrearDocumentoDto, ActualizarExtraidosDto, NuevaVersionDto } from './children.dto';
 import { CurrentUser, Perm, UsuarioInfo } from '../../common/decorators';
 import { contextoDe } from '../../common/req-context';
@@ -15,7 +16,7 @@ import { Request } from 'express';
 @ApiTags('documents')
 @Controller('documents')
 export class DocumentsController {
-  constructor(private readonly docs: DocumentsService) {}
+  constructor(private readonly docs: DocumentsService, private readonly blobs: BlobStorageService) {}
 
   /** GET /contracts/:id/documents — con sus versiones. */
   @Get('by-contract/:contractId')
@@ -86,6 +87,18 @@ export class DocumentsController {
     return this.docs.nuevaVersion(id, dto, archivo, contextoDe(req, u));
   }
 
+  @Get(':id/versions/:v/url')
+  @Perm('VER')
+  @ApiOperation({ summary: 'URL firmada de descarga de una versión (S3 presigned en prod; relativa en local)' })
+  async urlDescarga(
+    @Param('id') id: string,
+    @Param('v') v: string,
+    @CurrentUser() u: UsuarioInfo,
+    @Req() req: Request,
+  ) {
+    return this.docs.urlFirmada(id, Number(v));
+  }
+
   @Get(':id/versions/:v/file')
   @Perm('VER')
   @ApiOperation({ summary: 'Descarga el archivo de una versión (requiere URL firmada: token y exp)' })
@@ -99,9 +112,14 @@ export class DocumentsController {
     @Res() res: Response,
   ) {
     await this.docs.verificarToken(id, Number(v), token, exp);
-    const ruta = await this.docs.rutaDeArchivo(id, Number(v));
+    const clave = await this.docs.rutaDeArchivo(id, Number(v));
+    if (this.blobs.esS3(clave)) {
+      const stream = await this.blobs.getObjectStream(clave);
+      stream.pipe(res);
+      return;
+    }
     const dir = resolve(process.cwd(), process.env.UPLOAD_DIR ?? './data/uploads');
-    const abs = join(dir, ruta);
+    const abs = join(dir, clave);
     if (!existsSync(abs)) {
       throw new ForbiddenException('El archivo no está disponible en este servidor.');
     }

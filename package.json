@@ -26,6 +26,8 @@
     "db:reset": "docker compose down -v && docker compose up -d --wait --wait-timeout 60 db && pnpm migration:run && pnpm seed"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1146.0",
+    "@aws-sdk/s3-request-presigner": "^3.1146.0",
     "@nestjs/common": "^11.1.0",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.1.0",

@@ -24,6 +24,7 @@ import { PagosService } from './pagos.service';
 import { PagosExtrasController } from './pagos-extras.controller';
 import { DocumentsService } from './documents.service';
 import { DocumentsController } from './documents.controller';
+import { BlobStorageService } from '../../common/blob-storage';
 
 /**
  * Núcleo del dominio de contratos (sin el CRUD genérico de colecciones:
@@ -42,6 +43,7 @@ import { DocumentsController } from './documents.controller';
   providers: [
     ContractContextLoader, ContractsService,
     ObligacionesService, DocumentsService, PagosService,
+    BlobStorageService,
   ],
   controllers: [
     ContractsController,
