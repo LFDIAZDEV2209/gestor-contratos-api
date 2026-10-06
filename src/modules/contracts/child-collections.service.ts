@@ -186,7 +186,12 @@ export class ChildCollectionsService {
     const ent = await repo.findOne({ where: { id } } as never);
     if (!ent) throw new NoEncontrado(`El registro ${id}`);
     const e = ent as unknown as Record<string, unknown>;
-    if (e[def.campoEstado ?? 'motivoAnulacion'] != null) {
+    // Fix: con campoEstado (9/10 colecciones) se anula por estado==='Anulado';
+    // sin campoEstado (execs) se usa motivoAnulacion != null.
+    const yaAnulado = def.campoEstado
+      ? String(e[def.campoEstado]) === 'Anulado'
+      : e.motivoAnulacion != null;
+    if (yaAnulado) {
       throw new Validacion('El registro ya está anulado.');
     }
     if (def.campoEstado) e[def.campoEstado] = 'Anulado';

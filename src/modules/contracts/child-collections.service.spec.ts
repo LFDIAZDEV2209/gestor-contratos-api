@@ -458,6 +458,38 @@ describe('ChildCollectionsService', () => {
       expect(execsRepo.update).not.toHaveBeenCalled();
     });
 
+    it('anula colecciones con campoEstado (obligations) cuando estado != Anulado (regresión: != null anulaba siempre)', async () => {
+      const entDb = { id: 'OB-01', contractId: 'CT-01', estado: 'Pendiente', version: 1, motivoAnulacion: null };
+      oblsRepo.findOne
+        .mockResolvedValueOnce(entDb as any)
+        .mockResolvedValueOnce({ ...entDb, estado: 'Anulado', motivoAnulacion: 'Sobró la obligación', version: 2 } as any);
+      oblsRepo.update.mockResolvedValueOnce({ affected: 1, raw: [], generatedMaps: [] });
+
+      const res = await service.anular('obligations', 'OB-01', 'Sobró la obligación', ctx);
+      expect(oblsRepo.update).toHaveBeenCalledWith(
+        { id: 'OB-01' },
+        expect.objectContaining({
+          estado: 'Anulado',
+          motivoAnulacion: 'Sobró la obligación',
+          version: 2,
+        }),
+      );
+      expect(audit.registrar).toHaveBeenCalledWith(
+        ctx,
+        expect.arrayContaining([expect.objectContaining({ modulo: 'Obligaciones', accion: 'ANULAR' })]),
+      );
+      expect(res).toBeDefined();
+    });
+
+    it('rechaza re-anulación de una colección con campoEstado ya en Anulado', async () => {
+      oblsRepo.findOne.mockResolvedValueOnce({
+        id: 'OB-02', contractId: 'CT-01', estado: 'Anulado', version: 2, motivoAnulacion: 'X',
+      } as any);
+
+      await expect(service.anular('obligations', 'OB-02', 'Re-anular', ctx)).rejects.toThrow(Validacion);
+      expect(oblsRepo.update).not.toHaveBeenCalled();
+    });
+
     it('rechaza operaciones si el contrato padre está anulado', async () => {
       contractsRepo.findOne.mockResolvedValueOnce({ ...contratoPadreValido, anulado: true });
 
