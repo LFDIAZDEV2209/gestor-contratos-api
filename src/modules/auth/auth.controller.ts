@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LoginDto } from '../users/users.dto';
@@ -17,6 +17,7 @@ export class AuthController {
   ) {}
 
   @Post('auth/login')
+  @HttpCode(HttpStatus.OK)
   @Public()
   @ApiOperation({ summary: 'Login de demostración (correo de un usuario sembrado) → JWT' })
   login(@Body() dto: LoginDto, @Req() req: Request) {

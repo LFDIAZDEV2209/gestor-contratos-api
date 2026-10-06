@@ -23,7 +23,7 @@
     "seed": "ts-node -r dotenv/config src/database/seed/run-seed.ts",
     "db:up": "docker compose up -d db",
     "db:down": "docker compose down",
-    "db:reset": "docker compose down -v && docker compose up -d db && pnpm migration:run && pnpm seed"
+    "db:reset": "docker compose down -v && docker compose up -d --wait --wait-timeout 60 db && pnpm migration:run && pnpm seed"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.0",
