@@ -144,7 +144,8 @@ Write-JsonFile "$tmp\pol-deploy.json" @{
        Resource = "arn:aws:s3:::$bucket/*" },
     @{ Sid = "ArtifactsList"; Effect = "Allow"; Action = "s3:ListBucket"; Resource = "arn:aws:s3:::$bucket" },
     @{ Sid = "Services"; Effect = "Allow"; Action = @("ecs:DescribeServices","ecs:UpdateService")
-       Resource = @("arn:aws:ecs:${region}:${account}:service/nexogc-cluster/nexogc-api-svc", "arn:aws:ecs:${region}:${account}:service/nexogc-cluster/nexogc-front-svc") }
+       Resource = @("arn:aws:ecs:${region}:${account}:service/nexogc-cluster/nexogc-api-svc", "arn:aws:ecs:${region}:${account}:service/nexogc-cluster/nexogc-front-svc") },
+    @{ Sid = "PassRoles"; Effect = "Allow"; Action = "iam:PassRole"; Resource = @($execRoleArn, $taskRoleArn) }
   )
 }
 aws iam put-role-policy --role-name nexogc-cicd-deploy-role --policy-name nexogc-cicd-deploy --policy-document "file://$tmp\pol-deploy.json" | Out-Null
